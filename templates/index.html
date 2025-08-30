@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Ingreso al sistema</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <style>
+        body {
+            font-family: 'Roboto Condensed', sans-serif;
+            background-image: url('{{ url_for('static', filename='fondo.png') }}');
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            width: 320px;
+            text-align: center;
+        }
+        h2 {
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 8px;
+            background: #929497ff;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+            font-family: 'Roboto Condensed', sans-serif; /* Agrega esta línea para la fuente de los botones */
+        }
+        button:hover {
+            background: #878c92ff;
+        }
+        a {
+            font-size: 12px;
+            display: block;
+            margin-top: 5px;
+            text-decoration: underline;
+            color: black;
+            font-family: 'Roboto Condensed', sans-serif; /* Agrega esta línea para la fuente de los botones */
+        }
+        img {
+            margin-top: 20px;
+            max-width: 150px;
+        }
+        hr {
+            margin: 25px 0;
+            border: none;
+            border-top: 1px solid #eee;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <form action="{{ url_for('login') }}" method="post">
+            <h2>INGRESÁ</h2>
+            <input type="email" name="correo_login" placeholder="TUCORREO@EJEMPLO.COM" required>
+            <input type="password" name="password_login" placeholder="CONTRASEÑA" required>
+            <a href="#">¿Olvidaste tu contraseña?</a>
+            <button type="submit">ENTRAR</button>
+        </form>
+
+        <hr>
+
+        <form action="{{ url_for('register') }}" method="post">
+            <h2>REGISTRATE</h2>
+            <input type="email" name="correo_registro" placeholder="TUCORREO@EJEMPLO.COM" required>
+            <input type="password" name="password_registro" placeholder="CONTRASEÑA" required>
+            <button type="submit">REGISTRAR</button>
+        </form>
+
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+    </div>
+</body>
+</html>

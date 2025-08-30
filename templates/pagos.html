@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <title>Pagos</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Roboto Condensed', sans-serif;
+            background-image: url('{{ url_for('static', filename='fondo3.png') }}');
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background-color: white;
+            padding: 16px 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header .logo img {
+            height: 40px;
+        }
+
+        .header-menu {
+            display: flex;
+            gap: 20px;
+        }
+
+        .header-menu a {
+            text-decoration: none;
+            color: #555;
+            font-weight: 700;
+            transition: color 0.3s ease;
+        }
+
+        .header-menu a:hover {
+            color: #4CAF50;
+        }
+        
+        .header-menu {
+            display: flex;
+            gap: 20px;
+        }
+        .header-menu a {
+            text-decoration: none;
+            color: #555;
+            font-weight: 500;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .header-menu a:hover {
+            background-color: #e0e0e0;
+            color: #1a1a1a;
+        }
+        .header-menu a.active {
+            background-color: #d1d1d1;
+            color: #1a1a1a;
+            font-weight: 600;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .user-info span {
+            font-weight: 500;
+            color: #555;
+        }
+        .user-info a {
+            text-decoration: none;
+            color: white;
+            background-color: #dc3545;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        
+        .container {
+            padding: 10px 5px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .main-filtros {
+            background-color: rgba(255, 255, 255, 1);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 3000px;
+            margin: auto;
+        }
+
+        .main-content {
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 0px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 3000px;
+            margin: auto;
+            max-height: 75vh;
+            overflow: auto;
+        }
+
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+
+
+        .filter-and-cotizacion {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap; 
+            gap: 20px;
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .filter-buttons button,
+        .cotizacion-input-group button,
+        .save-button-group button,
+        .boton-preview {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            background-color: rgba(174, 174, 174, 1);
+            color: rgba(255, 255, 255, 1);
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .filter-buttons button:hover,
+        .cotizacion-input-group button:hover,
+        .save-button-group button:hover,
+        .boton-preview {
+            background-color: #435974ff;
+        }
+
+        .cotizacion-input-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .cotizacion-input-group label {
+            font-weight: bold;
+            color: #555;
+        }
+
+        .cotizacion-input-group input {
+            width: 120px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 0;
+            table-layout: auto;
+        }
+
+        thead {
+            background-color: #f8f8f8;
+            position: sticky;
+            top: 0;
+        }
+
+        th,
+        td {
+            padding: 8px 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+            white-space: nowrap;
+            font-size: 14px;
+        }
+
+        th {
+            font-weight: 700;
+            color: #555;
+            text-transform: uppercase;
+        }
+
+        tbody tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        .btn-link {
+            text-decoration: none;
+            color: #007bff;
+            transition: color 0.3s ease;
+            font-size: 12px;
+        }
+
+        .btn-link:hover {
+            color: #0056b3;
+        }
+
+        /* Estilos para los botones de acción en la tabla */
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+        }
+        .action-buttons button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 0;
+        }
+        .action-buttons button.edit-btn {
+            color: #007bff;
+        }
+        .action-buttons button.delete-btn {
+            color: #dc3545;
+        }
+
+        /* Estilos para los íconos de guardar y cancelar */
+        .action-buttons .save-icon,
+        .action-buttons .cancel-icon {
+            font-size: 16px; 
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+        
+        .action-buttons .save-icon {
+            color: #28a745;
+        }
+        .action-buttons .save-icon:hover {
+            color: #218838;
+        }
+        
+        .action-buttons .cancel-icon {
+            color: #dc3545;
+        }
+        .action-buttons .cancel-icon:hover {
+            color: #bd2130;
+        }
+
+        .editable-cell input, .editable-cell select {
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            padding: 4px;
+        }
+
+        /* Estilos para el mensaje de notificación */
+        #mensaje-box {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+            margin-top: 20px;
+        }
+
+        #mensaje-box.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        #mensaje-box.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        #mensaje-box.visible {
+            opacity: 1;
+        }
+
+        #mensaje-box.hidden {
+            display: none;
+        }
+
+        #generar-orden-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            background-color: #2b7526ff;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+
+
+        }
+
+
+
+        /* Estilos para la paginación */
+            .pagination-container {
+            /* Posicionamiento para fijar el contenedor al final de la ventana */
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            
+            /* Centra el contenedor interno de paginación */
+            display: flex; 
+            justify-content: center;
+            
+            /* Añade algo de espacio y un fondo opaco para que no se superponga con el contenido */
+            padding: 15px 0;
+            background: rgba(255, 255, 255, 0.58);
+            backdrop-filter: blur(5px); /* Efecto de desenfoque para modernizar */
+            box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+            z-index: 1000; /* Asegura que la paginación esté sobre otros elementos */
+        }
+
+        .pagination-inner {
+            /* Nuevo contenedor interno para el fondo */
+            background: rgba(255, 255, 255, 1);
+            border-radius: 25px; /* Bordes más redondeados */
+            padding: 10px 10px; /* El margen entre los ítems y el encuadrado blanco */
+            display: flex; /* Ahora este contenedor es un flexbox */
+            align-items: center;
+            gap: 10px; /* El espacio entre los botones */
+            font-size: 16px;
+            color: #555;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra sutil para destacar */
+        }
+
+        .pagination-inner button {
+            background: none;
+            border: 1px solid #ccc;
+            border-radius: 20px; /* Botones más redondeados */
+            padding: 8px 15px; /* Más espacio interno en los botones */
+            cursor: pointer;
+            transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+        }
+
+        .pagination-inner button:hover:not(:disabled) {
+            background-color: #f0f0f0;
+            border-color: #999;
+        }
+
+        .pagination-inner button:disabled {
+            cursor: not-allowed;
+            color: #ccc;
+            border-color: #eee;
+        }
+
+        .pagination-inner .page-info {
+            font-weight: bold;
+        }
+
+        @media print {
+            /* Ocultar todos los elementos excepto el modal de vista previa */
+            body * {
+                visibility: hidden;
+            }
+
+            #preview-modal,
+            #preview-modal * {
+                visibility: visible;
+            }
+
+            #preview-modal {
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                box-shadow: none !important;
+                border: none !important;
+                background: transparent !important;
+            }
+
+            #preview-modal .modal-content {
+                max-height: none !important;
+                overflow: visible !important;
+                margin: 0 auto !important;
+                page-break-inside: avoid;
+                box-shadow: none !important;
+                border: none !important;
+            }
+
+            
+
+            /* Estilos para la tabla */
+            #preview-table {
+                border-collapse: collapse; /* Unir los bordes de la tabla */
+                width: 100%; /* Asegurar que la tabla ocupe todo el ancho */
+            }
+            
+            #preview-table th,
+            #preview-table td {
+                border: 4px solid white; /* Bordes blancos y gruesos */
+                padding: 5px; /* Reducir el espaciado para que quepa más contenido */
+                font-size: 10px; /* Reducir el tamaño de la fuente para mejor ajuste */
+            }
+
+            /* Estilo de los encabezados (th) */
+            #preview-table th {
+                background-color: #899fb8ff;
+                color: white;
+                font-weight: bold;
+            }
+            
+            /* Estilo de las celdas de datos (td) */
+            #preview-table td {
+                background-color: #eaf0fcff;
+                color: #000000;
+                text-align: center;
+            }
+
+            /* Estilo del pie de página */
+            #preview-table tfoot td {
+                background-color: #607a95ff;
+                color: white;
+                font-weight: bold;
+            }
+
+            /* Ocultar los botones de acción al imprimir */
+            #preview-actions {
+                display: none !important;
+            }
+
+            /* Alineación de celdas con números a la derecha */
+            .num {
+                text-align: right;
+            }
+
+            #preview-modal + #preview-modal {
+            display: none;
+            }
+
+        }
+
+
+        /* Modal de filtros */
+        .modal {
+            position: fixed;
+            z-index: 2001; /* Más alto que el otro modal */
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content-filtros {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 600px;
+            border-radius: 8px;
+        }
+
+        .close-btn {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .close-btn:hover,
+        .close-btn:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .filter-rule {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .filter-rule select, .filter-rule input {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        
+        .filter-rule .remove-filter {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #add-filter-btn, #apply-filters-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+
+
+
+
+    </style>
+</head>
+
+<body>
+    <header class="header">
+        <div class="logo">
+            <img src="/static/logo.png" alt="Logo">
+        </div>
+        <nav class="header-menu">
+            <a href="/main">Menú principal</a>
+            <a href="/gastos">Registro de Gastos</a>
+            <a href="/pagos" class="active">Pagos</a>
+            <a href="/estructuras">Gestión de Estructuras</a>
+            <a href="/proveedores">Gestión de Proveedores</a>
+        </nav>
+        <div class="user-info">
+            <span>¡Bienvenido al gestor de KesslerKosher!</span>
+            <a href="/logout">Cerrar Sesión</a>
+        </div>
+    </header>
+    <div class="container">
+        <div class="main-filtros">
+            <h2>Listado de pagos</h2>
+            <div id="mensaje-box" class="hidden">
+                <p id="mensaje-texto"></p>
+            </div>
+            <div class="filter-and-cotizacion">
+                <div class="filter-buttons">
+                    <button id="btn-pendiente">Pendientes</button>
+                    <button id="btn-pagado">Pagados</button>
+                    <button id="btn-todo">Ver todos</button>
+                        <button id="btn-filtros">Filtros</button>
+                </div>
+                <div class="generar-orden-btn-group">
+                    <button id="generar-orden-btn" class="action-btn">
+                        <i class="fas fa-file-invoice"></i> Generar Orden de Pago
+                    </button>
+                </div>
+                <div class="cotizacion-input-group">
+                    <label for="cotizacion-input">Cotización ARS/USD:</label>
+                    <input type="number" id="cotizacion-input" step="0.01" placeholder="Ej. 950.50">
+                    <button id="aplicar-cotizacion-btn">Aplicar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container">
+        <div class="main-content">
+            <div class="table-responsive">
+                <div class="table-container">
+                    <table id="gastos-table">
+                        <thead>
+                            <tr>
+                                <th>Acción</th>
+                                <th>Pagar</th>
+                                <th>Fecha</th>
+                                <th>Detalle</th>
+                                <th>Estructura</th>
+                                <th>Subestructura</th>
+                                <th>Importe</th>
+                                <th>Semana Consumo</th>
+                                <th>Fecha Pago</th>
+                                <th>Semana Pago</th>
+                                <th>N° Orden</th>
+                                <th>Estado</th>
+                                <th>Proveedor</th>
+                                <th>Informe</th>
+                                <th>Moneda</th>
+                                <th>Cotización</th>
+                                <th>Total</th>
+                                <th>Factura</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-body">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>    
+    </div> 
+    <div id="filtros-modal" class="modal">
+        <div class="modal-content-filtros">
+            <span class="close-btn">&times;</span>
+            <h2>Filtros y Ordenación</h2>
+            <div id="filter-rules-container">
+                </div>
+            <div>
+                <button id="add-filter-btn" type="button">Agregar Filtro</button>
+            </div>
+            <div id="sort-rule-container" style="margin-top: 20px;">
+                <h4>Ordenar por:</h4>
+                <div class="filter-rule">
+                    <select id="sort-column-select"></select>
+                    <select id="sort-order-select">
+                        <option value="ASC">Ascendente</option>
+                        <option value="DESC">Descendente</option>
+                    </select>
+                </div>
+            </div>
+            <div style="text-align: right; margin-top: 20px;">
+                <button id="apply-filters-btn" type="button">Aplicar Filtros</button>
+            </div>
+        </div>
+    </div>
+    <div class="pagination-container">
+        <div class="pagination-inner">
+            <button id="first-page-btn" title="Primera página" disabled>«</button>
+            <button id="prev-page-btn" title="Página anterior" disabled>‹</button>
+            <span class="page-info">Página <span id="current-page">1</span> de <span id="total-pages">1</span></span>
+            <button id="next-page-btn" title="Página siguiente" disabled>›</button>
+            <button id="last-page-btn" title="Última página" disabled>»</button>
+        </div>
+    </div>
+
+    <!-- Modal de vista previa -->
+    <div id="preview-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+        background:rgba(0,0,0,0.5); z-index:2000; justify-content:center; align-items:center;">
+    <div class="modal-content" style="background:white; padding:20px; border-radius:10px; max-width:90%; max-height:90%; overflow:auto;">
+        <h2 id="preview-title">ORDEN DE PAGO N° —</h2>
+        <h2 id="preview-fecha"></h2>
+
+        <table id="preview-table" border="1" style="width:100%; border-collapse:collapse; margin-top:10px;">
+        <thead>
+            <tr>
+            <th>Fecha</th>
+            <th>Detalle</th>
+            <th>Estructura</th>
+            <th>Subestructura</th>
+            <th>Importe</th>
+            <th>Semana Consumo</th>
+            <th>Proveedor</th>
+            <th>Informe</th>
+            <th>Moneda</th>
+            <th>Cotización</th>
+            <th>Total</th>
+            </tr>  
+        </thead>
+        <tbody></tbody>
+        <tfoot>
+            <tr>
+            <td colspan="10" class="num" style="font-weight:bold;">TOTAL:</td>
+            <td id="preview-total" class="num"></td>
+            </tr>
+        </tfoot>
+        </table>
+
+        <div id="preview-actions" style="margin-top:15px; text-align:right;">
+        <button class="boton-preview" id="cerrar-preview" type="button">Cerrar</button>
+        <button class="boton-preview" id="confirmar-orden" type="button">Confirmar Orden</button>
+        <button class="boton-preview" id="imprimir-preview" type="button">Imprimir</button>
+        </div>
+    </div>
+    </div>
+
+
+    <script>
+        function mostrarMensaje(mensaje, tipo = 'success') {
+            const mensajeBox = document.getElementById('mensaje-box');
+            const mensajeTexto = document.getElementById('mensaje-texto');
+            
+            mensajeTexto.textContent = mensaje;
+            mensajeBox.className = tipo;
+            mensajeBox.classList.remove('hidden');
+            mensajeBox.classList.add('visible');
+
+            setTimeout(() => {
+                mensajeBox.classList.remove('visible');
+                mensajeBox.classList.add('hidden');
+            }, 5000);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const tablaBody = document.getElementById('tabla-body');
+            const btnPendiente = document.getElementById('btn-pendiente');
+            const btnPagado = document.getElementById('btn-pagado');
+            const btnTodo = document.getElementById('btn-todo');
+                        const btnFiltros = document.getElementById('btn-filtros');
+
+            const filtrosModal = document.getElementById('filtros-modal');
+            const closeBtn = filtrosModal.querySelector('.close-btn');
+            const addFilterBtn = document.getElementById('add-filter-btn');
+            const applyFiltersBtn = document.getElementById('apply-filters-btn');
+            const filterRulesContainer = document.getElementById('filter-rules-container');
+            const sortColumnSelect = document.getElementById('sort-column-select');
+
+            let allGastos = [];
+            let selectedGastos = {};  // ✅ agregado
+            let currentFilter = 'todo'; 
+            let currentPage = 1;
+            const perPage = 16;
+            let totalPages = 1;
+
+            const safeFloat = (value) => {
+                if (value === null || value === undefined || value === '') {
+                    return null;
+                }
+                const numberValue = parseFloat(value);
+                return isNaN(numberValue) ? null : numberValue;
+            };
+            
+            const formatNumber = (value) => {
+                if (value === null || value === undefined || typeof value !== 'number') {
+                    return '';
+                }
+                return value.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            };
+
+            // Declarar la función de formato fuera de createRowHtml
+            const formatLocalDate = (dateStr) => {
+                if (!dateStr) return '';
+                const parts = dateStr.split('-');
+                if (parts.length === 3) {
+                    const year = parts[0];
+                    const month = String(parts[1]).padStart(2, '0');
+                    const day = String(parts[2]).padStart(2, '0');
+                    return `${day}/${month}/${year}`;
+                }
+                return dateStr;
+            };
+
+
+
+
+
+
+            const createRowHtml = (gasto) => {
+                const importe = safeFloat(gasto.importe);
+                const cotizacion = safeFloat(gasto.cotizacion); 
+                const total = safeFloat(gasto.total);
+
+                const verFacturaHtml = (gasto.ver_factura && gasto.ver_factura.trim() !== '') ? `<a href="${gasto.ver_factura}" target="_blank" class="btn-link">Ver</a>` : '';
+
+                const checkboxHtml = gasto.estado === 'Pendiente' ? 
+                    `<input type="checkbox">` : 
+                    `<input type="checkbox" disabled>`;
+                
+                return `
+                    <td class="action-buttons">
+                        <button class="edit-btn">✏️</button>
+                        <button class="delete-btn">🗑️</button>
+                    </td>
+                    <td>${checkboxHtml}</td>
+                    <td data-field="fecha_del_gasto" data-value="${gasto.fecha_gasto}">${formatLocalDate(gasto.fecha_gasto) || ''}</td>
+                    <td data-field="detalle" data-value="${gasto.descripcion || ''}">${gasto.descripcion || ''}</td>
+                    <td data-field="id_estructura" data-id="${gasto.id_estructura || ''}" data-value="${gasto.estructura || ''}">${gasto.estructura || ''}</td>
+                    <td data-field="id_subestructura" data-id="${gasto.id_subestructura || ''}" data-value="${gasto.subestructura || ''}">${gasto.subestructura || ''}</td>
+                    <td data-field="importe" data-value="${importe !== null ? importe : ''}">${formatNumber(importe)}</td>
+                    <td data-field="n_de_semana_del_consumo" data-value="${gasto.semana_consumo || ''}">${gasto.semana_consumo || ''}</td>
+                    <td data-field="fecha_de_pago" data-value="${gasto.fecha_pago || ''}">${formatLocalDate(gasto.fecha_pago) || ''}</td>
+                    <td data-field="numero_de_semana_del_pago" data-value="${gasto.semana_pago || ''}">${gasto.semana_pago || ''}</td>
+                    <td data-field="id_orden" data-value="${gasto.orden_pago || ''}">${gasto.orden_pago || ''}</td>
+                    <td data-field="estado" data-value="${gasto.estado || ''}">${gasto.estado || ''}</td>
+                    <td>${gasto.proveedor || ''}</td>
+                    <td data-field="informe" data-value="${gasto.informe || ''}">${gasto.informe || ''}</td>
+                    <td data-field="moneda" data-value="${gasto.moneda || ''}">${gasto.moneda || ''}</td>
+                    <td data-field="cotizacion" data-value="${cotizacion !== null ? cotizacion : ''}">${formatNumber(cotizacion)}</td>
+                    <td>${formatNumber(total)}</td>
+                    <td>${verFacturaHtml}</td>
+                `;
+            };
+
+
+
+
+
+
+
+
+            const renderizarTabla = (gastos) => {
+                tablaBody.innerHTML = '';
+                if (gastos.length === 0) {
+                    const noDataRow = document.createElement('tr');
+                    noDataRow.innerHTML = `<td colspan="10" style="text-align:center;">No hay gastos para mostrar.</td>`;
+                    tablaBody.appendChild(noDataRow);
+                } else {
+                    gastos.forEach(gasto => {
+                        const row = document.createElement('tr');
+                        row.dataset.gastoId = gasto.id_gastos;
+                        row.innerHTML = createRowHtml(gasto);
+
+                        // restaurar estado del checkbox
+                        const checkbox = row.querySelector('input[type="checkbox"]');
+                        if (checkbox && selectedGastos[gasto.id_gastos]) {
+                            checkbox.checked = true;
+                        }
+
+                        // evento para guardar selección al cambiar
+                        if (checkbox) {
+                            checkbox.addEventListener('change', (e) => {
+                                if (e.target.checked) {
+                                    selectedGastos[gasto.id_gastos] = gasto;
+                                } else {
+                                    delete selectedGastos[gasto.id_gastos];
+                                }
+                            });
+                        }
+
+                        tablaBody.appendChild(row);
+                    });
+                }
+            };
+
+            const renderizarPaginacion = (totalPages, currentPage) => {
+                document.getElementById('current-page').textContent = currentPage;
+                document.getElementById('total-pages').textContent = totalPages;
+                
+                document.getElementById('first-page-btn').disabled = currentPage === 1;
+                document.getElementById('prev-page-btn').disabled = currentPage === 1;
+                document.getElementById('next-page-btn').disabled = currentPage === totalPages;
+                document.getElementById('last-page-btn').disabled = currentPage === totalPages;
+            };
+
+            const cargarPagos = async (page = 1, estado = currentFilter) => {
+                currentPage = page;
+                currentFilter = estado;
+                try {
+                    const response = await fetch(`/api/gastos_pagos?page=${currentPage}&per_page=${perPage}&estado=${currentFilter}`);
+                    if (!response.ok) {
+                        throw new Error('Error al cargar los datos');
+                    }
+                    const data = await response.json();
+                    
+                    allGastos = data.gastos; 
+                    totalPages = data.total_pages;
+                    
+                    renderizarTabla(allGastos);
+                    renderizarPaginacion(totalPages, currentPage);
+                } catch (error) {
+                    console.error('Error:', error);
+                    tablaBody.innerHTML = `<tr><td colspan="16" style="text-align:center;">${error.message}</td></tr>`;
+                }
+            };
+
+            const cargarEstructuras = async () => {
+                try {
+                    const response = await fetch('/api/estructuras');
+                    if (!response.ok) {
+                        throw new Error('Error al cargar las estructuras');
+                    }
+                    return await response.json();
+                } catch (error) {
+                    console.error('Error:', error);
+                    return [];
+                }
+            };
+            
+            const getSubestructurasForEstructura = async (estructuraId) => {
+                try {
+                    const response = await fetch(`/api/subestructuras/${estructuraId}`);
+                    return await response.json();
+                } catch (error) {
+                    console.error('Error al cargar subestructuras:', error);
+                    return [];
+                }
+            };
+
+            const handleEditClick = async (row) => {
+                const gastoId = row.dataset.gastoId;
+                const gasto = allGastos.find(g => g.id_gastos == gastoId);
+                const editableCells = row.querySelectorAll('[data-field]');
+                
+                row.classList.add('editing');
+                const actionButtonsCell = row.querySelector('.action-buttons');
+                
+                actionButtonsCell.innerHTML = `
+                    <i class="fas fa-check save-icon" onclick="handleSaveClick(this)"></i>
+                    <i class="fas fa-times cancel-icon" onclick="handleCancelClick(this)"></i>
+                `;
+                
+                for (const cell of editableCells) {
+                    const field = cell.dataset.field;
+                    const value = cell.dataset.value;
+                    let inputHtml = '';
+                    
+                    if (field === 'fecha_del_gasto' || field === 'fecha_de_pago') {
+                        inputHtml = `<input type="date" value="${value || ''}" data-field="${field}">`;
+                    } else if (field === 'id_estructura') {
+                        const estructuras = await cargarEstructuras();
+                        let selectHtml = `<select data-field="id_estructura">`;
+                        selectHtml += `<option value="">-- Seleccionar --</option>`;
+                        estructuras.forEach(e => {
+                            selectHtml += `<option value="${e.id_estructura}" ${e.id_estructura == gasto.id_estructura ? 'selected' : ''}>${e.estructura}</option>`;
+                        });
+                        selectHtml += `</select>`;
+                        inputHtml = selectHtml;
+                    } else if (field === 'id_subestructura') {
+                        const subestructuras = await getSubestructurasForEstructura(gasto.id_estructura);
+                        let selectHtml = `<select data-field="id_subestructura">`;
+                        selectHtml += `<option value="">-- Seleccionar --</option>`;
+                        subestructuras.forEach(s => {
+                            selectHtml += `<option value="${s.id_subestructura}" ${s.id_subestructura == gasto.id_subestructura ? 'selected' : ''}>${s.subestructura}</option>`;
+                        });
+                        selectHtml += `</select>`;
+                        inputHtml = selectHtml;
+                    } else if (field === 'estado') {
+                        inputHtml = `
+                            <select data-field="${field}">
+                                <option value="Pendiente" ${value === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
+                                <option value="Pagado" ${value === 'Pagado' ? 'selected' : ''}>Pagado</option>
+                            </select>
+                        `;
+                    } else if (field === 'moneda') {
+                         inputHtml = `
+                            <select data-field="${field}">
+                                <option value="ARG" ${value === 'ARG' ? 'selected' : ''}>ARG</option>
+                                <option value="USD" ${value === 'USD' ? 'selected' : ''}>USD</option>
+                                <option value="ISL" ${value === 'ISL' ? 'selected' : ''}>ISL</option>
+                            </select>
+                         `;
+                    } else if (field === 'importe' || field === 'cotizacion') {
+                        inputHtml = `<input type="number" value="${value || ''}" data-field="${field}" step="0.01">`;
+                    } else {
+                         inputHtml = `<input type="text" value="${value || ''}" data-field="${field}">`;
+                    }
+                    cell.innerHTML = inputHtml;
+                }
+
+                const estructuraSelect = row.querySelector('select[data-field="id_estructura"]');
+                if (estructuraSelect) {
+                    estructuraSelect.addEventListener('change', async () => {
+                        const selectedId = estructuraSelect.value;
+                        const subestructuraCell = row.querySelector('[data-field="id_subestructura"]');
+                        const subestructuras = await getSubestructurasForEstructura(selectedId);
+                        
+                        let selectHtml = `<select data-field="id_subestructura">`;
+                        selectHtml += `<option value="">-- Seleccionar --</option>`;
+                        subestructuras.forEach(s => {
+                            selectHtml += `<option value="${s.id_subestructura}">${s.subestructura}</option>`;
+                        });
+                        selectHtml += `</select>`;
+                        subestructuraCell.innerHTML = selectHtml;
+                    });
+                }
+            };
+            
+            const handleSaveClick = async (element) => {
+                const row = element.closest('tr');
+                const gastoId = row.dataset.gastoId;
+                const inputs = row.querySelectorAll('input, select');
+                const changes = {};
+
+                inputs.forEach(input => {
+                    const field = input.dataset.field;
+                    let value = input.value;
+                    if (['id_estructura', 'id_subestructura', 'n_de_semana_del_consumo', 'id_orden', 'numero_de_semana_del_pago', 'importe', 'cotizacion'].includes(field)) {
+                        if (value === '') {
+                            value = null;
+                        }
+                    }
+                    changes[field] = value;
+                });
+
+                try {
+                    const response = await fetch(`/api/guardar_cambios/${gastoId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(changes)
+                    });
+
+                    const result = await response.json();
+                    if (response.ok) {
+                        mostrarMensaje(result.success);
+                        cargarPagos(currentPage, currentFilter);
+                    } else {
+                        mostrarMensaje(`Error al guardar: ${result.error}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    mostrarMensaje('Error de conexión al guardar los cambios.', 'error');
+                }
+            };
+
+            const handleDeleteClick = async (row) => {
+                const gastoId = row.dataset.gastoId;
+                const confirmDelete = confirm('¿Estás seguro de que quieres anular este gasto? Se moverá a la tabla de anulados.');
+
+                if (confirmDelete) {
+                    try {
+                        const response = await fetch(`/api/anular_gasto/${gastoId}`, { method: 'DELETE' });
+                        const result = await response.json();
+
+                        if (response.ok) {
+                            mostrarMensaje('Gasto anulado y movido exitosamente.');
+                            cargarPagos(currentPage, currentFilter);
+                        } else {
+                            mostrarMensaje(`Error al anular: ${result.error}`, 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        mostrarMensaje('Error de conexión al anular el gasto.', 'error');
+                    }
+                }
+            };
+            
+            const handleCancelClick = (element) => {
+                const row = element.closest('tr');
+                const gastoId = row.dataset.gastoId;
+                const gasto = allGastos.find(g => g.id_gastos == gastoId);
+                
+                if (gasto) {
+                    row.innerHTML = createRowHtml(gasto);
+                    row.classList.remove('editing');
+                } else {
+                    location.reload();
+                }
+            };
+
+            tablaBody.addEventListener('click', async (event) => {
+                const target = event.target;
+                const row = target.closest('tr');
+                if (!row) return;
+
+                if (target.classList.contains('edit-btn')) {
+                    handleEditClick(row);
+                } else if (target.classList.contains('delete-btn')) {
+                    handleDeleteClick(row);
+                } else if (target.classList.contains('save-icon')) {
+                    handleSaveClick(target);
+                } else if (target.classList.contains('cancel-icon')) {
+                    handleCancelClick(target);
+                }
+            });
+
+            btnPendiente.addEventListener('click', () => {
+                cargarPagos(1, 'pendiente');
+            });
+            btnPagado.addEventListener('click', () => {
+                cargarPagos(1, 'pagado');
+            });
+            btnTodo.addEventListener('click', () => {
+                cargarPagos(1, 'todo');
+            });
+
+            // Evento del botón Filtros
+            document.getElementById("btn-filtros").addEventListener("click", function () {
+                alert("Acá se abrirán los filtros (pendiente de implementar).");
+            });
+
+            document.getElementById('first-page-btn').addEventListener('click', () => {
+                cargarPagos(1, currentFilter);
+            });
+            document.getElementById('prev-page-btn').addEventListener('click', () => {
+                if (currentPage > 1) {
+                    cargarPagos(currentPage - 1, currentFilter);
+                }
+            });
+            document.getElementById('next-page-btn').addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    cargarPagos(currentPage + 1, currentFilter);
+                }
+            });
+            document.getElementById('last-page-btn').addEventListener('click', () => {
+                cargarPagos(totalPages, currentFilter);
+            });
+
+            const cotizacionInput = document.getElementById('cotizacion-input');
+            const aplicarCotizacionBtn = document.getElementById('aplicar-cotizacion-btn');
+
+            aplicarCotizacionBtn.addEventListener('click', async () => {
+                const cotizacion = cotizacionInput.value;
+                if (!cotizacion || isNaN(cotizacion) || cotizacion <= 0) {
+                    mostrarMensaje('Por favor, ingresa una cotización válida.', 'error');
+                    return;
+                }
+                try {
+                    const response = await fetch('/api/aplicar_cotizacion', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ cotizacion: parseFloat(cotizacion) })
+                    });
+                    const result = await response.json();
+                    if (response.ok) {
+                        mostrarMensaje(result.success);
+                        cargarPagos(currentPage, currentFilter); 
+                    } else {
+                        mostrarMensaje(`Error al aplicar cotización: ${result.error}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    mostrarMensaje('Error de conexión al aplicar la cotización.', 'error');
+                }
+            });
+
+            document.getElementById('generar-orden-btn').addEventListener('click', () => {
+                const seleccionados = Object.values(selectedGastos);
+                if (seleccionados.length === 0) {
+                    mostrarMensaje('No seleccionaste ningún gasto.', 'error');
+                    return;
+                }
+
+                // 🚩 Paso 1: Limpiar el contenido del modal para evitar duplicados
+                const modalContent = document.querySelector('#preview-modal .modal-content');
+                modalContent.innerHTML = '';
+                
+                // 🚩 Paso 2: Construir todo el contenido HTML desde cero
+                let totalPrincipal = 0;
+                const tbodyHtml = seleccionados.map(g => {
+                    const importe = parseFloat(g.importe) || 0;
+                    const cotizacion = parseFloat(g.cotizacion) || 1;
+                    const totalGasto = parseFloat(g.total) || (importe * cotizacion);
+                    totalPrincipal += totalGasto;
+
+                    let simbolo = g.moneda === "USD" ? "US$" : "$";
+                    let fechaGasto = g.fecha_gasto ? new Date(new Date(g.fecha_gasto).getTime() + 86400000).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+
+                    return `
+                        <tr>
+                            <td>${fechaGasto}</td>
+                            <td>${g.descripcion || ''}</td>
+                            <td>${g.estructura || ''}</td>
+                            <td>${g.subestructura || ''}</td>
+                            <td class="num">${simbolo} ${importe.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+                            <td>${g.semana_consumo || ''}</td>
+                            <td>${g.proveedor || ''}</td>
+                            <td>${g.informe || ''}</td>
+                            <td>${g.moneda || ''}</td>
+                            <td class="num">${g.moneda === 'USD' ? '' : cotizacion.toFixed(2) || ''}</td>
+                            <td class="num">US$ ${totalGasto.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                // Calcular totales por estructura
+                const totalesPorEstructura = {};
+                let granTotal = 0;
+                seleccionados.forEach(gasto => {
+                    const estructura = gasto.estructura || 'Sin estructura';
+                    const totalEnUsd = parseFloat(gasto.total) || 0;
+                    if (totalesPorEstructura[estructura]) {
+                        totalesPorEstructura[estructura] += totalEnUsd;
+                    } else {
+                        totalesPorEstructura[estructura] = totalEnUsd;
+                    }
+                    granTotal += totalEnUsd;
+                });
+
+                const totalesHtml = `
+                    <div class="totales-container">
+                        <table id="totales-por-estructura-table">
+                            <thead>
+                                <tr>
+                                    <th colspan="2">TOTAL USD</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${Object.keys(totalesPorEstructura).map(estructura => {
+                                    const total = totalesPorEstructura[estructura].toLocaleString('es-AR', { minimumFractionDigits: 2 });
+                                    return `
+                                        <tr>
+                                            <td>${estructura}</td>
+                                            <td class="num">US$ ${total}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td>TOTAL GENERAL:</td>
+                                    <td class="num">US$ ${granTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                `;
+
+                // 🚩 Paso 3: Obtener número de orden y fecha
+                fetch('/getUltimaOrden')
+                .then(res => res.json())
+                .then(data => {
+                    const nuevoNumeroOrden = (data.numero_orden || 0) + 1;
+                    const hoy = new Date();
+                    const fechaStr = hoy.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+                    // 🚩 Paso 4: Insertar todo el HTML en el modal
+                    modalContent.innerHTML = `
+                        <h1 id="preview-title">Orden de pago N° ${nuevoNumeroOrden}</h1>
+                        <h2 id="preview-fecha">Fecha: ${fechaStr}</h2>
+                        <div class="totales-container" style="max-width: 350px; margin: 0 0 20px 0;">
+                            <table id="totales-por-estructura-table" style="border-collapse: collapse; width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th colspan="2" style="border: 2px solid white; padding: 6px; font-size: 10px; background-color: #899fb8ff; color: white; text-align: center;">TOTAL USD</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${Object.keys(totalesPorEstructura).map(estructura => {
+                                        const total = totalesPorEstructura[estructura].toLocaleString('es-AR', { minimumFractionDigits: 2 });
+                                        return `
+                                            <tr>
+                                                <td style="border: 2px solid white; padding: 6px; font-size: 10px; background-color: #eaf0fcff; color: #000000;">${estructura}</td>
+                                                <td class="num" style="border: 2px solid white; padding: 6px; font-size: 10px; background-color: #eaf0fcff; color: #000000; text-align: right;">US$ ${total}</td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td style="border: 2px solid white; padding: 6px; font-size: 10px; background-color: #475566ff; color: white; font-weight: bold;">TOTAL GENERAL:</td>
+                                        <td class="num" style="border: 2px solid white; padding: 6px; font-size: 10px; background-color: #475566ff; color: white; font-weight: bold; text-align: right;">US$ ${granTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <table id="preview-table" style="border-collapse: collapse; width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th style="border: 2px solid white; padding: 5px; font-size: 10px; background-color: #899fb8ff; color: white; font-weight: bold; text-align: center;">Fecha</th>
+                                    <th style="border: 2px solid white; padding: 5px; font-size: 10px; background-color: #899fb8ff; color: white; font-weight: bold; text-align: center;">Detalle</th>
+                                    <th style="border: 2px solid white; padding: 5px; font-size: 10px; background-color: #899fb8ff; color: white; font-weight: bold; text-align: center;">Estructura</th>
+                                    <th style="border: 2px solid white; padding: 5px; font-size: 10px; background-color: #899fb8ff; color: white; font-weight: bold; text-align: center;">Subestructura</th>
+                                    <th class="num" style="border: 2px solid white; padding: 5px; font-size: 10px; background-color: #899fb8ff; color: white; font-weight: bold; text-align: center;">Importe</th>
+                                    <th style="border: 2px solid white; padding: 5px; font-size: 10px; background-color: #899fb8ff; color: white; font-weight: bold; text-align: center;">Semana Consumo</th>
+                                    <th style="border: 2px solid white; padding: 5px; font-size: 10px; background-color: #899fb8ff; color: white; font-weight: bold; text-align: center;">Proveedor</th>
+                                    <th style="border: 2px solid white; padding: 5px; font-size: 10px; background-color: #899fb8ff; color: white; font-weight: bold; text-align: center;">Informe</th>
+                                    <th style="border: 2px solid white; padding: 5px; font-size: 10px; background-color: #899fb8ff; color: white; font-weight: bold; text-align: center;">Moneda</th>
+                                    <th class="num" style="border: 2px solid white; padding: 5px; font-size: 10px; background-color: #899fb8ff; color: white; font-weight: bold; text-align: center;">Cotización</th>
+                                    <th class="num" style="border: 2px solid white; padding: 5px; font-size: 10px; background-color: #899fb8ff; color: white; font-weight: bold; text-align: center;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>${tbodyHtml}</tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="10" class="num" style="font-weight:bold; border: 2px solid white; padding: 5px; font-size: 10px; background-color: #475566ff; color: white; text-align: right;">TOTAL:</td>
+                                    <td id="preview-total" class="num" style="border: 2px solid white; padding: 5px; font-size: 10px; background-color: #475566ff; color: white; font-weight: bold; text-align: right;">US$ ${totalPrincipal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        <div id="preview-actions">
+                            <button class="boton-preview" id="cerrar-preview" type="button">Cerrar</button>
+                            <button class="boton-preview" id="confirmar-orden" type="button">Confirmar Orden</button>
+                            <button class="boton-preview" id="imprimir-preview" type="button">Imprimir</button>
+                        </div>
+                    `;
+
+
+                    // 🚩 Paso 5: Re-agregar eventos a los nuevos botones
+                    document.getElementById('cerrar-preview').addEventListener('click', () => {
+                        document.getElementById('preview-modal').style.display = 'none';
+                    });
+
+                    document.getElementById('confirmar-orden').addEventListener('click', async () => {
+                        // Creamos un array de IDs para enviar al backend
+                        const gastosAConfirmar = Object.values(selectedGastos).map(gasto => ({ id_gastos: gasto.id_gastos }));
+
+                        if (gastosAConfirmar.length === 0) {
+                            mostrarMensaje('No hay gastos seleccionados para confirmar.', 'error');
+                            return;
+                        }
+
+                        try {
+                            // Creamos un objeto que incluye los IDs y la fecha de hoy
+                            const dataToSend = {
+                                gastos: gastosAConfirmar,
+                                fecha_confirmacion: new Date().toISOString().slice(0, 10)
+                            };
+
+                            const response = await fetch('/confirmarOrden', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(dataToSend)
+                            });
+                            const result = await response.json();
+                            
+                            if (response.ok) {
+                                mostrarMensaje('Orden confirmada correctamente.');
+                                document.getElementById('preview-modal').style.display = 'none';
+                                selectedGastos = {};
+                                const checkboxes = document.querySelectorAll('#pagosTable tbody input[type="checkbox"]');
+                                checkboxes.forEach(checkbox => {
+                                    checkbox.checked = false;
+                                });
+                                cargarPagos(); 
+                            } else {
+                                mostrarMensaje(`Error al confirmar orden: ${result.error}`, 'error');
+                            }
+                        } catch (error) {
+                            console.error('Error:', error);
+                            mostrarMensaje('Error de conexión al confirmar orden.', 'error');
+                        }
+                    });
+
+
+                    // Este es el único evento de impresión que debe existir
+                    document.getElementById('imprimir-preview').addEventListener('click', () => {
+                        const modalContent = document.querySelector('#preview-modal .modal-content').innerHTML;
+                        const printWindow = window.open('', '', 'height=600,width=800');
+                        printWindow.document.write('<html><head><title>Orden de Pago</title>');
+                        printWindow.document.write('<style>');
+                        printWindow.document.write(`
+                            @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&display=swap');
+
+                            body {
+                                font-family: 'Roboto Condensed', sans-serif;
+                                margin: 0;
+                                padding: 0;
+                            }
+
+                            h2, h1 {
+                                text-align: center;
+                                font-family: 'Roboto Condensed', sans-serif;
+                                color: #333;
+                                margin-bottom: 20px;
+                            }
+                            .modal-content {
+                                font-family: 'Roboto Condensed', sans-serif;
+                                max-height: none !important;
+                                overflow: visible !important;
+                                margin: 0 !important;
+                                page-break-inside: avoid;
+                                box-shadow: none !important;
+                                border: none !important;
+                            }
+
+                            /* Estilos para la tabla de totales */
+                            .totales-container {
+                                max-width: 350px;
+                                margin: 0 0 20px 0;
+                            }
+                            #totales-por-estructura-table, #preview-table {
+                                border-collapse: collapse;
+                                width: 100%;
+                            }
+                            #totales-por-estructura-table th, #totales-por-estructura-table td {
+                                border: 2px solid white;
+                                padding: 6px;
+                                font-size: 10px;
+                            }
+                            #totales-por-estructura-table th {
+                                background-color: #899fb8ff;
+                                color: white;
+                                text-align: center;
+                            }
+                            #totales-por-estructura-table td {
+                                background-color: #eaf0fcff; /* ⬅️ Se cambió a celeste claro */
+                                color: #000000;
+                            }
+                            #totales-por-estructura-table tfoot td {
+                                background-color: #475566ff;
+                                color: white;
+                                font-weight: bold;
+                            }
+
+                            /* Estilos para la tabla principal */
+                            #preview-table th, #preview-table td {
+                                border: 2px solid white;
+                                padding: 5px;
+                                font-size: 10px;
+                            }
+                            #preview-table th {
+                                background-color: #899fb8ff;
+                                color: white;
+                                font-weight: bold;
+                                text-align: center;
+                            }
+                            #preview-table td {
+                                background-color: #eaf0fcff; /* ⬅️ Se cambió a celeste claro */
+                                color: #000000;
+                                text-align: center;
+                            }
+                            #preview-table tfoot td {
+                                background-color: #475566ff;
+                                color: white;
+                                font-weight: bold;
+                            }
+                            .num {
+                                text-align: right;
+                            }
+                            #preview-actions {
+                                display: none;
+                            }
+                        `);
+                        printWindow.document.write('</style>');
+                        printWindow.document.write('</head><body onload="window.print();window.close()">');
+                        printWindow.document.write(modalContent);
+                        printWindow.document.write('</body></html>');
+                        printWindow.document.close();
+                    });
+
+
+                    // Mostrar modal
+                    document.getElementById('preview-modal').style.display = 'flex';
+
+                })
+                .catch(err => console.error("Error al obtener última orden:", err));
+            });
+
+
+
+            // Botón cerrar
+            document.getElementById('cerrar-preview').addEventListener('click', () => {
+                document.getElementById('preview-modal').style.display = 'none';
+            });
+
+            document.getElementById('confirmar-orden').addEventListener('click', async () => {
+                const seleccionados = Object.values(selectedGastos);
+                if (seleccionados.length === 0) {
+                    mostrarMensaje('No hay gastos seleccionados.', 'error');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/confirmarOrden', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ gastos: seleccionados })
+                    });
+                    const result = await response.json();
+
+                    if (response.ok) {
+                        mostrarMensaje('Orden confirmada correctamente.');
+                        document.getElementById('preview-modal').style.display = 'none';
+
+                        // Vaciar el objeto de gastos seleccionados
+                        selectedGastos = {};
+
+                        // Desmarcar todos los checkboxes de la tabla
+                        const checkboxes = document.querySelectorAll('#pagosTable tbody input[type="checkbox"]');
+                        checkboxes.forEach(checkbox => {
+                            checkbox.checked = false;
+                        });
+
+                        cargarPagos(); // Refresca la tabla para mostrar los gastos como 'Pagado'
+
+                    } else {
+                        mostrarMensaje(`Error al confirmar orden: ${result.error}`, 'error');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    mostrarMensaje('Error de conexión al confirmar orden.', 'error');
+                }
+            });
+
+            cargarPagos();
+        });
+
+    </script>
+</body>
+</html>

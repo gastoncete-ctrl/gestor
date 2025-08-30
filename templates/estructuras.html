@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <title>Ordenes de pago</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Estilos para el contenedor del chat */
+        .chat-container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            font-family: 'Roboto Condensed', sans-serif;
+        }
+
+        /* Estilos del área de mensajes */
+        #chat-output {
+            height: 300px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 15px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            background-color: #f9f9f9;
+        }
+
+        /* Estilos para los mensajes */
+        .chat-message {
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .user-message {
+            color: #007bff;
+            font-weight: bold;
+        }
+
+        .gemini-message {
+            color: #333;
+        }
+
+        /* Estilos para el formulario de entrada */
+        #chat-form {
+            display: flex;
+            gap: 10px;
+        }
+
+        #chat-input {
+            flex-grow: 1;
+            padding: 10px 15px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+
+        #chat-send-btn {
+            padding: 10px 20px;
+            border: none;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        #chat-send-btn:hover {
+            background-color: #45a049;
+        }
+    </style>
+

@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <title>Registro de Gastos</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Roboto Condensed', sans-serif;
+            background-image: url('{{ url_for('static', filename='fondo3.png') }}');
+            margin: 0;
+            padding: 0;
+        }
+        .header {
+            background-color: white;
+            padding: 16px 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header .logo img {
+            height: 40px;
+        }
+        .header-menu {
+            display: flex;
+            gap: 20px;
+        }
+        .header-menu a {
+            text-decoration: none;
+            color: #555;
+            font-weight: 500;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .header-menu a:hover {
+            background-color: #e0e0e0;
+            color: #1a1a1a;
+        }
+        .header-menu a.active {
+            background-color: #d1d1d1;
+            color: #1a1a1a;
+            font-weight: 600;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .user-info span {
+            font-weight: 500;
+            color: #555;
+        }
+        .user-info a {
+            text-decoration: none;
+            color: white;
+            background-color: #dc3545;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+        }
+        .main-container {
+            padding: 24px;
+        }
+        .content-wrapper {
+            display: flex;
+            gap: 24px;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        .analysis-box {
+            background-color: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 20px;
+        }
+        #drop-area {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            width: 80%;
+            padding: 40px;
+            cursor: pointer;
+            text-align: center;
+            transition: border-color 0.3s;
+        }
+        #drop-area.highlight {
+            border-color: #3b82f6;
+        }
+        #drop-area.active {
+            border-color: #22c55e;
+        }
+        #drop-area p {
+            margin: 0;
+            color: #666;
+        }
+        .file-info {
+            font-weight: bold;
+            color: #333;
+        }
+        #analizar-btn, #guardar-btn, #add-proveedor-btn, #registrar-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            background: #929497ff;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            font-family: 'Roboto Condensed', sans-serif; /* Agrega esta línea para la fuente de los botones */
+        }
+        #analizar-btn:hover, #guardar-btn:hover {
+            background: #878c92ff;
+        }
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #09f;
+            animation: spin 1s ease infinite;
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .content {
+            background-color: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            flex-grow: 1;
+            max-width: 600px;
+        }
+        .content h1 {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+        .form-group-flex {
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+        }
+        .form-group-flex select {
+            flex-grow: 1;
+        }
+        .form-group-flex button {
+            white-space: nowrap;
+            padding: 10px 15px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            padding: 20px;
+            border: 1px solid #888;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 500px;
+            position: relative;
+        }
+        .close-btn {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            position: absolute;
+            top: 10px;
+            right: 20px;
+        }
+        .close-btn:hover,
+        .close-btn:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">
+            <img src="/static/logo.png" alt="Logo">
+        </div>
+        <nav class="header-menu">
+            <a href="/main">Menú principal</a>
+            <a href="/gastos" class="active">Registro de Gastos</a>
+            <a href="/pagos">Pagos</a>
+            <a href="/estructuras">Gestión de Estructuras</a>
+            <a href="/proveedores">Gestión de Proveedores</a>
+        </nav>
+        <div class="user-info">
+            <span>¡Bienvenido al gestor de KesslerKosher!</span>
+            <a href="/logout">Cerrar Sesión</a>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="content-wrapper">
+            <div class="analysis-box">
+                <h2>
+                    Analizar documento usando Gemini AI
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Google-gemini-icon.svg/2048px-Google-gemini-icon.svg.png" alt="Icono de Gemini" width="24" height="24" style="vertical-align: middle;">
+                </h2>
+                <div id="drop-area">
+                    <p>Arrastra y suelta tu archivo aquí</p>
+                    <p class="file-info"></p>
+                </div>
+                <button id="analizar-btn">Analizar</button>
+                <div class="loading-spinner"></div>
+            </div>
+
+            <div class="content">
+                <h1>Registro de Gastos</h1>
+                <form id="gasto-form">
+                    <div class="form-group">
+                        <label for="date">Fecha</label>
+                        <input type="date" id="date" name="fecha" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="descripcion">Descripción</label>
+                        <input type="text" id="descripcion" name="descripcion" placeholder="Ej. Compras de supermercado" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="monto">Monto</label>
+                        <input type="number" id="monto" name="monto" step="0.01" placeholder="Ej. 50.75" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="semana_consumo">Semana de consumo</label>
+                        <input type="number" id="semana_consumo" name="semana_consumo" step="0" placeholder="Ej. 32" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="numero_factura">Número de factura</label>
+                        <input type="text" id="numero_factura" name="numero_factura" placeholder="Ej. 0001-0005823">
+                    </div>
+                    <div class="form-group">
+                        <label for="proveedor">Proveedor</label>
+                        <div class="form-group-flex">
+                            <input type="text" id="proveedor-input" name="proveedor-input" list="proveedores-list" placeholder="Escribe para buscar..." required autocomplete="off">
+                            <datalist id="proveedores-list">
+                                {% for proveedor in proveedores %}
+                                <option value="{{ proveedor.nombre_proveedores }}" data-id="{{ proveedor.id_proveedor }}">
+                                    {{ proveedor.nombre_proveedores }}
+                                </option>
+                                {% endfor %}
+                            </datalist>
+                            <input type="hidden" id="proveedor-id" name="proveedor-id">
+                            <button type="button" id="add-proveedor-btn">Registrar Nuevo</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="estructura-input">Estructura</label>
+                        <input list="estructuras-list" id="estructura-input" name="estructura" placeholder="Selecciona o busca una estructura" required autocomplete="off">
+                        <datalist id="estructuras-list">
+                            {% for estructura in estructuras %}
+                                <option value="{{ estructura.estructura }}" data-id="{{ estructura.id_estructura }}"></option>
+                            {% endfor %}
+                        </datalist>
+                        <input type="hidden" id="estructura-id" name="id_estructura">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="subestructura-input">Subestructura</label>
+                        <input list="subestructuras-list" id="subestructura-input" name="subestructura" placeholder="Selecciona una subestructura" disabled required autocomplete="off">
+                        <datalist id="subestructuras-list"></datalist>
+                        <input type="hidden" id="subestructura-id" name="id_subestructura">
+                    </div>
+                    <div class="form-group">
+                        <label for="link">Link</label>
+                        <input type="text" id="link" name="link" placeholder="Ej. https://www.google.com (Campo opcional)">
+                    </div>
+                    <div class="form-group">
+                        <label for="moneda">Moneda</label>
+                        <select id="moneda" name="moneda" required>
+                            <option value="ARG">ARG</option>
+                            <option value="USD">USD</option>
+                            <option value="ISL">ISL</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <button type="submit" id="guardar-btn">Guardar Gasto</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>    
+</body>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    // --- Elementos del DOM ---
+    const dropArea = document.getElementById('drop-area');
+    const fileInfo = document.querySelector('.file-info');
+    const analizarBtn = document.getElementById('analizar-btn');
+    const loadingSpinner = document.querySelector('.loading-spinner');
+    const gastoForm = document.getElementById('gasto-form');
+    const guardarBtn = document.getElementById('guardar-btn');
+
+    const fechaInput = document.getElementById('date');
+    const descripcionInput = document.getElementById('descripcion');
+    const montoInput = document.getElementById('monto');
+    const numeroFacturaInput = document.getElementById('numero_factura');
+    const monedaInput = document.getElementById('moneda');
+    const linkInput = document.getElementById('link');
+
+    const estructuraInput = document.getElementById('estructura-input');
+    const estructuraIdInput = document.getElementById('estructura-id');
+    const subestructuraInput = document.getElementById('subestructura-input');
+    const subestructuraDatalist = document.getElementById('subestructuras-list');
+    const subestructuraIdInput = document.getElementById('subestructura-id');
+
+    const proveedorInput = document.getElementById('proveedor-input');
+    const proveedorIdInput = document.getElementById('proveedor-id');
+    const proveedorDatalist = document.getElementById('proveedores-list');
+    const addProveedorBtn = document.getElementById('add-proveedor-btn');
+
+    let fileToUpload = null;
+
+    // --- Funciones auxiliares ---
+    function mostrarMensaje(mensaje, tipo = 'success') {
+        const alertDiv = document.createElement('div');
+        alertDiv.textContent = mensaje;
+        alertDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-family: 'Roboto Condensed', sans-serif;
+            font-weight: bold;
+            color: white;
+            background-color: ${tipo === 'success' ? '#28a745' : '#dc3545'};
+            z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: opacity 0.5s ease-in-out;
+        `;
+        document.body.appendChild(alertDiv);
+        setTimeout(() => {
+            alertDiv.style.opacity = '0';
+            setTimeout(() => alertDiv.remove(), 500);
+        }, 3000);
+    }
+
+    function toggleLoading(isLoading) {
+        loadingSpinner.style.display = isLoading ? 'block' : 'none';
+        analizarBtn.disabled = isLoading;
+        analizarBtn.textContent = isLoading ? 'Analizando...' : 'Analizar';
+    }
+
+    // --- Lógica del formulario ---
+    
+    // Función para cargar las subestructuras dinámicamente
+    const cargarSubestructuras = async (estructuraId) => {
+        if (!estructuraId) {
+            subestructuraInput.disabled = true;
+            subestructuraDatalist.innerHTML = '';
+            return;
+        }
+        subestructuraInput.disabled = false;
+        subestructuraDatalist.innerHTML = '';
+
+        try {
+            const response = await fetch(`/api/subestructuras/${estructuraId}`);
+            const subestructuras = await response.json();
+            
+            subestructuras.forEach(sub => {
+                const option = document.createElement('option');
+                option.value = sub.subestructura;
+                option.dataset.id = sub.id_subestructura;
+                subestructuraDatalist.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error al cargar subestructuras:', error);
+            mostrarMensaje('Error al cargar las subestructuras.', 'error');
+        }
+    };
+
+    // Evento para detectar cambios en la estructura y cargar subestructuras
+    estructuraInput.addEventListener('input', () => {
+        const selectedOption = document.querySelector(`#estructuras-list option[value="${estructuraInput.value}"]`);
+        if (selectedOption) {
+            const estructuraId = selectedOption.dataset.id;
+            estructuraIdInput.value = estructuraId;
+            cargarSubestructuras(estructuraId);
+        } else {
+            estructuraIdInput.value = '';
+            subestructuraInput.value = ''; // ✅ Limpiar el valor de subestructura
+            cargarSubestructuras(null);
+        }
+    });
+
+    // Evento para actualizar el ID de la subestructura
+    subestructuraInput.addEventListener('input', () => {
+        const selectedOption = document.querySelector(`#subestructuras-list option[value="${subestructuraInput.value}"]`);
+        if (selectedOption) {
+            subestructuraIdInput.value = selectedOption.dataset.id;
+        } else {
+            subestructuraIdInput.value = '';
+        }
+    });
+    
+    // Evento para actualizar el ID del proveedor
+    proveedorInput.addEventListener('input', () => {
+        const selectedOption = document.querySelector(`#proveedores-list option[value="${proveedorInput.value}"]`);
+        if (selectedOption) {
+            proveedorIdInput.value = selectedOption.dataset.id;
+        } else {
+            proveedorIdInput.value = '';
+        }
+    });
+    
+    // Modal para registrar nuevo proveedor
+    addProveedorBtn.addEventListener('click', () => {
+        const nombreProveedor = prompt("Ingrese el nombre del nuevo proveedor:");
+        if (!nombreProveedor) return;
+        const cuit = prompt("Ingrese el CUIT:");
+        if (!cuit) return;
+        const cbuAlias = prompt("Ingrese el CVU/CBU o Alias - DNI:");
+        if (!cbuAlias) return;
+
+        // Enviar datos al backend
+        fetch('/api/proveedores/registrar', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                nombre: nombreProveedor,
+                cuit: cuit,
+                cbu_alias: cbuAlias
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                mostrarMensaje('Proveedor registrado con éxito.');
+                // Actualizar la lista de proveedores en el datalist
+                const newOption = document.createElement('option');
+                newOption.value = nombreProveedor;
+                newOption.dataset.id = data.id;
+                proveedorDatalist.appendChild(newOption);
+                proveedorInput.value = nombreProveedor;
+                proveedorIdInput.value = data.id;
+
+            } else {
+                mostrarMensaje('Error al registrar el proveedor: ' + data.error, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            mostrarMensaje('Error de conexión al registrar el proveedor.', 'error');
+        });
+    });
+
+    // --- Analizador de archivos (Gemini) ---
+
+    // Drag and drop events
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, () => dropArea.classList.add('highlight'), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, () => dropArea.classList.remove('highlight'), false);
+    });
+
+    dropArea.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        if (files.length > 0) {
+            fileToUpload = files[0];
+            fileInfo.textContent = `Archivo seleccionado: ${fileToUpload.name}`;
+            dropArea.classList.add('active');
+        }
+    }, false);
+    
+    // Click del botón Analizar
+    analizarBtn.addEventListener('click', async () => {
+        if (!fileToUpload) {
+            mostrarMensaje('Por favor, arrastra un archivo primero.', 'error');
+            return;
+        }
+
+        toggleLoading(true);
+
+        const formData = new FormData();
+        formData.append('file', fileToUpload);
+
+        try {
+            const response = await fetch('/api/analizar', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+
+            if (response.ok) {
+                mostrarMensaje('Análisis completado con éxito.');
+                // Rellenar campos del formulario
+                fechaInput.value = result.fecha || '';
+                descripcionInput.value = result.descripcion || '';
+                montoInput.value = result.monto || '';
+                numeroFacturaInput.value = result.numero_factura || '';
+                linkInput.value = result.link_drive || '';
+
+                if (result.proveedor) {
+                    const proveedorMatch = document.querySelector(`#proveedores-list option[value*="${result.proveedor}"]`);
+                    if (proveedorMatch) {
+                        proveedorInput.value = proveedorMatch.value;
+                        proveedorIdInput.value = proveedorMatch.dataset.id;
+                    } else {
+                        proveedorInput.value = result.proveedor;
+                        proveedorIdInput.value = '';
+                    }
+                }
+            } else {
+                mostrarMensaje(`Error en el análisis: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            mostrarMensaje('Hubo un error de conexión con el servidor.', 'error');
+        } finally {
+            toggleLoading(false);
+        }
+    });
+
+    // --- Guardar Gasto ---
+    gastoForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        guardarBtn.disabled = true;
+        guardarBtn.textContent = 'Guardando...';
+
+        const formData = {
+            fecha: fechaInput.value,
+            descripcion: descripcionInput.value,
+            monto: montoInput.value,
+            moneda: monedaInput.value,
+            numero_factura: numeroFacturaInput.value || null,
+            id_proveedor: proveedorIdInput.value,
+            id_estructura: estructuraIdInput.value,
+            id_subestructura: subestructuraIdInput.value,
+            semana_consumo: document.getElementById('semana_consumo').value,
+            link_drive: linkInput.value || null
+        };
+
+        try {
+            const response = await fetch('/api/guardar_gasto', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            const result = await response.json();
+
+            if (response.ok) {
+                mostrarMensaje('Gasto guardado exitosamente.');
+                gastoForm.reset();
+                subestructuraInput.disabled = true;
+                subestructuraDatalist.innerHTML = '';
+            } else {
+                mostrarMensaje(`Error al guardar: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            mostrarMensaje('Hubo un error de conexión al guardar el gasto.', 'error');
+        } finally {
+            guardarBtn.disabled = false;
+            guardarBtn.textContent = 'Guardar Gasto';
+        }
+    });
+});
+</script>
+
+</html>

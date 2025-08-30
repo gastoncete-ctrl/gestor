@@ -1,0 +1,16 @@
+# Archivos de configuración y bases de datos que no deben ser versionados
+bdgastos.db
+instance/bdgastos.db
+instance/usuarios.db
+
+# Archivos con secretos de Google
+token.json
+client_secret_490282261143-bdatp2uc2kf6orfepdkavkns3vrr5rad.apps.googleusercontent.com.json
+rich-suprstate-469604-f5-4b19b0c2333c.json
+
+# .gitignore
+...
+.env
+
+rich-suprstate-469604-f5-f034662b9c3e.json
+token.json
