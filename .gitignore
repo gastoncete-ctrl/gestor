@@ -7,10 +7,8 @@ instance/usuarios.db
 token.json
 client_secret_490282261143-bdatp2uc2kf6orfepdkavkns3vrr5rad.apps.googleusercontent.com.json
 rich-suprstate-469604-f5-4b19b0c2333c.json
+token.json
 
 # .gitignore
 ...
 .env
-
-rich-suprstate-469604-f5-f034662b9c3e.json
-token.json
