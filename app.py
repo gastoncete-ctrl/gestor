@@ -285,30 +285,24 @@ SCOPES = ['https://www.googleapis.com/auth/drive']
 TOKEN_FILE = os.environ.get('TOKEN_FILE')
 
 def get_drive_service():
-    token_env = os.environ.get('GOOGLE_DRIVE_TOKEN_JSON')
-    if not token_env:
-        raise RuntimeError("Falta la variable de entorno GOOGLE_DRIVE_TOKEN_JSON.")
+    creds = None
 
-    try:
-        info = json.loads(token_env)
-    except Exception:
-        # Soporte opcional si decidís guardar el JSON en base64
-        import base64
-        try:
-            info = json.loads(base64.b64decode(token_env).decode('utf-8'))
-        except Exception as e:
-            raise RuntimeError(f"GOOGLE_DRIVE_TOKEN_JSON inválido: {e}")
+    token_env = os.environ.get("GOOGLE_DRIVE_TOKEN_JSON")
+    if token_env:
+        creds = Credentials.from_authorized_user_info(json.loads(token_env), SCOPES)
 
-    # Construye credenciales tipo "authorized_user" (con refresh_token)
-    creds = Credentials.from_authorized_user_info(info=info, scopes=SCOPES)
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            creds_env = os.environ.get("GOOGLE_DRIVE_CREDENTIALS_JSON")
+            if not creds_env:
+                raise RuntimeError("Falta GOOGLE_DRIVE_CREDENTIALS_JSON")
+            flow = InstalledAppFlow.from_client_config(json.loads(creds_env), SCOPES)
+            creds = flow.run_local_server(port=0)
+            # en Cloud Run no se guarda en archivo → copiás el JSON nuevo y lo actualizás en la variable de entorno
 
-    # Refresca si hace falta
-    if creds and creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-
-    # Listo: cliente de Drive
-    return build('drive', 'v3', credentials=creds)
-
+    return build("drive", "v3", credentials=creds)
 
 def upload_to_drive(file_content, filename, mimetype):
     try:
