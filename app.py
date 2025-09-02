@@ -286,23 +286,22 @@ TOKEN_FILE = os.environ.get('TOKEN_FILE')
 
 def get_drive_service():
     creds = None
-
-    token_env = os.environ.get("GOOGLE_DRIVE_TOKEN_JSON")
-    if token_env:
-        creds = Credentials.from_authorized_user_info(json.loads(token_env), SCOPES)
-
+    
+    # 1. Intenta obtener el token desde la variable de entorno.
+    token_data_str = os.environ.get("GOOGLE_DRIVE_TOKEN_JSON")
+    
+    if token_data_str:
+        # 2. Si el token existe, carga las credenciales.
+        token_data = json.loads(token_data_str)
+        creds = Credentials.from_authorized_user_info(info=token_data, scopes=SCOPES)
+    
+    # 3. Si no hay token, o el token no es válido, levanta un error.
+    # En la nube, siempre debe haber un token válido.
     if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            creds_env = os.environ.get("GOOGLE_DRIVE_CREDENTIALS_JSON")
-            if not creds_env:
-                raise RuntimeError("Falta GOOGLE_DRIVE_CREDENTIALS_JSON")
-            flow = InstalledAppFlow.from_client_config(json.loads(creds_env), SCOPES)
-            creds = flow.run_local_server(port=0)
-            # en Cloud Run no se guarda en archivo → copiás el JSON nuevo y lo actualizás en la variable de entorno
-
+        raise RuntimeError("Google Drive token not found.")
+        
     return build("drive", "v3", credentials=creds)
+
 
 def upload_to_drive(file_content, filename, mimetype):
     try:
