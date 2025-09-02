@@ -286,20 +286,25 @@ TOKEN_FILE = os.environ.get('TOKEN_FILE')
 
 def get_drive_service():
     creds = None
-    # Intenta cargar las credenciales desde una variable de entorno
-    if 'GOOGLE_DRIVE_CREDENTIALS_JSON' in os.environ:
-        creds_json = json.loads(os.environ.get('GOOGLE_DRIVE_CREDENTIALS_JSON'))
-        flow = InstalledAppFlow.from_client_secrets_json(creds_json, SCOPES)
-        creds = flow.run_local_server(port=0)
-    else:
-        # Si no existe la variable de entorno, asume que es un entorno local
-        # y utiliza el archivo local
-        if os.path.exists('client_secret.json'):
-            flow = InstalledAppFlow.from_client_secrets_file('client_secret.json', SCOPES)
-            creds = flow.run_local_server(port=0)
+    # Primero, intenta cargar las credenciales de una variable de entorno (para Cloud Run)
+    if 'GOOGLE_DRIVE_TOKEN_JSON' in os.environ:
+        creds_json = json.loads(os.environ.get('GOOGLE_DRIVE_TOKEN_JSON'))
+        creds = Credentials.from_authorized_user_info(info=creds_json, scopes=SCOPES)
+        # Aquí no se necesita run_local_server() porque ya tenemos un token válido
+
+    # Si no hay credenciales en la variable de entorno, procede con el flujo local
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
         else:
-            # Si no hay variable ni archivo local, la aplicación no puede autenticarse
-            raise RuntimeError("Google Drive credentials not found.")
+            # Usa el método correcto: from_client_config
+            flow = InstalledAppFlow.from_client_config(
+                json.loads(os.environ.get('GOOGLE_DRIVE_CREDENTIALS_JSON')), SCOPES)
+            creds = flow.run_local_server(port=0)
+
+        # Guarda el token para usarlo en el futuro (si es local)
+        with open('token.json', 'w') as token:
+            token.write(creds.to_json())
 
     return build('drive', 'v3', credentials=creds)
 
