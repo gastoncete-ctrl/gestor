@@ -286,27 +286,30 @@ TOKEN_FILE = os.environ.get('TOKEN_FILE')
 
 def get_drive_service():
     creds = None
-    # Primero, intenta cargar las credenciales de una variable de entorno (para Cloud Run)
+    
+    # Intenta cargar las credenciales del token de la variable de entorno
     if 'GOOGLE_DRIVE_TOKEN_JSON' in os.environ:
-        creds_json = json.loads(os.environ.get('GOOGLE_DRIVE_TOKEN_JSON'))
-        creds = Credentials.from_authorized_user_info(info=creds_json, scopes=SCOPES)
-        # Aquí no se necesita run_local_server() porque ya tenemos un token válido
-
-    # Si no hay credenciales en la variable de entorno, procede con el flujo local
+        token_data = json.loads(os.environ.get('GOOGLE_DRIVE_TOKEN_JSON'))
+        creds = Credentials.from_authorized_user_info(info=token_data, scopes=SCOPES)
+    
+    # Si no se pudo cargar el token de la variable de entorno o no es válido,
+    # intenta el flujo local para obtener uno nuevo.
     if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            # Usa el método correcto: from_client_config
-            flow = InstalledAppFlow.from_client_config(
-                json.loads(os.environ.get('GOOGLE_DRIVE_CREDENTIALS_JSON')), SCOPES)
+        # Aquí, el código solo se ejecutará en un entorno local con navegador.
+        # En la nube, esta parte del código nunca se alcanzará si la variable de entorno está bien configurada.
+        if os.path.exists('client_secret.json'):
+            flow = InstalledAppFlow.from_client_secrets_file('client_secret.json', SCOPES)
             creds = flow.run_local_server(port=0)
-
-        # Guarda el token para usarlo en el futuro (si es local)
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
-
+            
+            # Guarda el nuevo token localmente para el futuro
+            with open('token.json', 'w') as token:
+                token.write(creds.to_json())
+        else:
+            # Si no hay token en la nube ni archivo local, la aplicación no puede autenticarse
+            raise RuntimeError("Google Drive token not found.")
+            
     return build('drive', 'v3', credentials=creds)
+
 
 def upload_to_drive(file_content, filename, mimetype):
     try:
