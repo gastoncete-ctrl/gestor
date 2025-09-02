@@ -292,8 +292,14 @@ def get_drive_service():
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                GOOGLE_DRIVE_CREDENTIALS_FILE, SCOPES)
+            # Primero, intenta cargar las credenciales de una variable de entorno
+            if 'GOOGLE_DRIVE_CREDENTIALS_JSON' in os.environ:
+                creds_json = json.loads(os.environ.get('GOOGLE_DRIVE_CREDENTIALS_JSON'))
+                flow = InstalledAppFlow.from_client_secrets_json(creds_json, SCOPES)
+            else:
+                # Si no encuentra la variable de entorno, usa el archivo local
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    GOOGLE_DRIVE_CREDENTIALS_FILE, SCOPES)
             creds = flow.run_local_server(port=0)
         with open(TOKEN_FILE, 'w') as token:
             token.write(creds.to_json())
