@@ -291,6 +291,8 @@ def get_drive_service():
     if 'GOOGLE_DRIVE_TOKEN_JSON' in os.environ:
         token_data = json.loads(os.environ.get('GOOGLE_DRIVE_TOKEN_JSON'))
         creds = Credentials.from_authorized_user_info(info=token_data, scopes=SCOPES)
+        print(f"Valor de la variable: {os.environ.get('GOOGLE_DRIVE_TOKEN_JSON')}") # <-- AGREGA ESTA LÍNEA
+
     
     # Si no se pudo cargar el token de la variable de entorno o no es válido,
     # intenta el flujo local para obtener uno nuevo.
