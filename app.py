@@ -285,27 +285,28 @@ SCOPES = ['https://www.googleapis.com/auth/drive']
 TOKEN_FILE = os.environ.get('TOKEN_FILE')
 
 def get_drive_service():
-    creds = None
-    
-    # Intenta cargar las credenciales del token de la variable de entorno
-    if 'GOOGLE_DRIVE_TOKEN_JSON' in os.environ:
-        token_data = json.loads(os.environ.get('GOOGLE_DRIVE_TOKEN_JSON'))
-        creds = Credentials.from_authorized_user_info(info=token_data, scopes=SCOPES)
-    
-    # Si no se pudo cargar el token, asume un entorno local
-    if not creds or not creds.valid:
-        if os.path.exists('token.json'):
-            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file('client_secret.json', SCOPES)
-            creds = flow.run_local_server(port=0)
+    token_env = os.environ.get('GOOGLE_DRIVE_TOKEN_JSON')
+    if not token_env:
+        raise RuntimeError("Falta la variable de entorno GOOGLE_DRIVE_TOKEN_JSON.")
 
-        # Guarda el token para usarlo en el futuro
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
-            
+    try:
+        info = json.loads(token_env)
+    except Exception:
+        # Soporte opcional si decidís guardar el JSON en base64
+        import base64
+        try:
+            info = json.loads(base64.b64decode(token_env).decode('utf-8'))
+        except Exception as e:
+            raise RuntimeError(f"GOOGLE_DRIVE_TOKEN_JSON inválido: {e}")
+
+    # Construye credenciales tipo "authorized_user" (con refresh_token)
+    creds = Credentials.from_authorized_user_info(info=info, scopes=SCOPES)
+
+    # Refresca si hace falta
+    if creds and creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+
+    # Listo: cliente de Drive
     return build('drive', 'v3', credentials=creds)
 
 
