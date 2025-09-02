@@ -14,7 +14,7 @@ import pandas as pd
 import csv
 from sqlalchemy import text
 from dotenv import load_dotenv
-
+from sqlalchemy import or_, and_ # Asegúrate de que esta línea esté al inicio del archivo
 
 # Cargar las variables de entorno del archivo .env
 load_dotenv()
@@ -32,6 +32,7 @@ import pymysql
 pymysql.install_as_MySQLdb()
 
 app = Flask(__name__)
+app.config['SQLALCHEMY_ECHO'] = True
 
 # Configura la conexión a tu base de datos MySQL
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLALCHEMY_DATABASE_URI')
@@ -81,6 +82,7 @@ class Gasto(db.Model):
     id_subestructura = db.Column(db.Integer, db.ForeignKey('subestructuras.id_subestructura'))
     id_proveedor = db.Column(db.Integer, db.ForeignKey('proveedores.id_proveedor'))
     n_factura = db.Column('N FACTURA', db.String(255))
+    # ✅ CORREGIR ESTA LÍNEA
     n_de_semana_del_consumo = db.Column('N DE SEMANA DEL CONSUMO', db.Integer)
     id_orden = db.Column('id_orden', db.Integer)
     fecha_de_pago = db.Column('FECHA DE PAGO', db.Date)
@@ -89,11 +91,71 @@ class Gasto(db.Model):
     moneda = db.Column('MONEDA', db.String(50))
     cot = db.Column('COT.', db.Float)
     url = db.Column('url', db.Text)
+    tipo = db.Column('tipo_de_movimiento', db.String(12))
+
     
     estructura = db.relationship('Estructura')
     subestructura = db.relationship('Subestructura')
     proveedor = db.relationship('Proveedor')
     
+    def to_dict(self):
+        return {
+            "id_gastos": self.id_gastos,
+            "fecha_gasto": self.fecha_del_gasto.isoformat() if self.fecha_del_gasto else None,
+            "descripcion": self.detalle,
+            "importe": self.importe,
+            "semana_consumo": self.n_de_semana_del_consumo,
+            "fecha_pago": self.fecha_de_pago.isoformat() if self.fecha_de_pago else None,
+            "semana_pago": self.numero_de_semana_del_pago,
+            "orden_pago": self.id_orden,
+            "estado": 'Pagado' if self.id_orden is not None and self.id_orden > 0 else 'Pendiente',
+            "informe": self.informe,
+            "moneda": self.moneda,
+            "cotizacion": self.cot,
+            "total": (self.importe / self.cot) if self.cot is not None and self.cot > 0 else (self.importe if self.moneda == 'USD' else None),
+            "ver_factura": self.url,
+            "id_proveedor": self.id_proveedor,
+            "proveedor": self.proveedor.nombre_proveedores if self.proveedor else None, # ✅ CAMBIO CRÍTICO AQUÍ
+            "id_estructura": self.id_estructura,
+            "estructura": self.estructura.estructura if self.estructura else None,
+            "id_subestructura": self.id_subestructura,
+            "subestructura": self.subestructura.subestructura if self.subestructura else None,
+            "tipo_de_movimiento": self.tipo,
+        }
+
+
+
+@app.route('/api/gastos_pagos/all', methods=['GET'])
+def get_all_gastos_for_download():
+    try:
+        # Realiza uniones (joins) para obtener los datos de las tablas relacionadas
+        gastos = db.session.query(
+            Gasto,
+            Estructura.estructura,
+            Subestructura.subestructura,
+            Proveedor.nombre_proveedores.label('proveedor_nombre')
+        ).outerjoin(Estructura, Gasto.id_estructura == Estructura.id_estructura) \
+         .outerjoin(Subestructura, Gasto.id_subestructura == Subestructura.id_subestructura) \
+         .outerjoin(Proveedor, Gasto.id_proveedor == Proveedor.id_proveedor) \
+         .order_by(Gasto.fecha_del_gasto.desc()) \
+         .all()
+        
+        gastos_list = []
+        for gasto, estructura_nombre, subestructura_nombre, proveedor_nombre in gastos:
+            gasto_dict = gasto.to_dict()
+            gasto_dict['estructura'] = estructura_nombre
+            gasto_dict['subestructura'] = subestructura_nombre
+            gasto_dict['proveedor'] = proveedor_nombre
+            gastos_list.append(gasto_dict)
+        
+        return jsonify({'gastos': gastos_list}), 200
+    except Exception as e:
+        print(f"Error al obtener todos los gastos con detalles: {e}")
+        return jsonify({'error': 'Error al obtener todos los gastos con detalles.'}), 500
+
+
+
+
 
 
 
@@ -458,6 +520,7 @@ def guardar_gasto():
     numero_factura = data.get('numero_factura')
     semana_consumo = data.get('semana_consumo')
     link_drive = data.get('link_drive')
+    tipo_de_movimiento = data.get('tipo_de_movimiento') 
 
     if not all([fecha, descripcion, monto, id_estructura, id_subestructura, id_proveedor]):
         return jsonify({"error": "Faltan datos para guardar el gasto."}), 400
@@ -479,6 +542,7 @@ def guardar_gasto():
             n_factura=numero_factura,
             n_de_semana_del_consumo=semana_consumo,
             url=link_drive,
+            tipo=tipo_de_movimiento,
         )
         db.session.add(nuevo_gasto)
         db.session.commit()
@@ -634,6 +698,7 @@ def guardar_cambios(gasto_id):
         if not gasto:
             return jsonify({'error': 'Gasto no encontrado.'}), 404
 
+        # Lógica para actualizar los campos
         if 'fecha_del_gasto' in data and data['fecha_del_gasto']:
             gasto.fecha_del_gasto = datetime.strptime(data['fecha_del_gasto'], '%Y-%m-%d').date()
         if 'detalle' in data and data['detalle']:
@@ -644,14 +709,23 @@ def guardar_cambios(gasto_id):
             gasto.id_estructura = data['id_estructura']
         if 'id_subestructura' in data and data['id_subestructura']:
             gasto.id_subestructura = data['id_subestructura']
-        if 'semana_consumo' in data and data['semana_consumo']:
-            gasto.n_de_semana_del_consumo = data['semana_consumo']
+
+        # ✅ LÓGICA CORREGIDA PARA LOS CAMPOS QUE NO SE GUARDABAN
+        if 'n_de_semana_del_consumo' in data and data['n_de_semana_del_consumo']:
+            gasto.n_de_semana_del_consumo = data['n_de_semana_del_consumo']
+        if 'fecha_de_pago' in data and data['fecha_de_pago']:
+            gasto.fecha_de_pago = datetime.strptime(data['fecha_de_pago'], '%Y-%m-%d').date()
+        if 'numero_de_semana_del_pago' in data and data['numero_de_semana_del_pago']:
+            gasto.numero_de_semana_del_pago = data['numero_de_semana_del_pago']
+        if 'id_orden' in data and data['id_orden']:
+            gasto.id_orden = data['id_orden']
+            
         if 'id_proveedor' in data and data['id_proveedor']:
             gasto.id_proveedor = data['id_proveedor']
         if 'moneda' in data and data['moneda']:
             gasto.moneda = data['moneda']
         
-        # Lógica para la cotización - ¡USANDO LA CLAVE CORRECTA!
+        # Lógica para la cotización
         if 'cotizacion' in data:
             cot_value = data['cotizacion']
             if cot_value is not None and str(cot_value).strip() != '':
@@ -978,6 +1052,113 @@ def get_ordenes_ids():
 
 
 
+@app.route("/finanzas")
+def finanzas():
+    if 'user_id' not in session:
+        return redirect(url_for('main'))
+    return render_template("finanzas.html")
+
+
+
+
+@app.route('/api/finanzas/saldo_financiera', methods=['GET'])
+def get_saldo_financiera():
+    try:
+        # ✅ Paso 1: Obtener los gastos con el nuevo filtro condicional
+        gastos_financiera = db.session.query(Gasto).filter(
+            or_(
+                Gasto.tipo == 'Ingresa a la financiera',
+                and_(Gasto.tipo == 'Sale por financiera', Gasto.id_orden.isnot(None))
+            )
+        ).order_by(Gasto.fecha_del_gasto).all()
+        
+        # ✅ Paso 2: Agrupar los gastos
+        movimientos_agrupados = {}
+        for gasto in gastos_financiera:
+            tipo = gasto.tipo
+            id_referencia = gasto.id_orden if tipo == 'Sale por financiera' else gasto.id_gastos
+            
+            # Aseguramos que el importe no sea nulo antes de la conversión
+            importe_gasto = float(gasto.importe) if gasto.importe is not None else 0
+
+            # ✅ Lógica de conversión de moneda usando el campo 'cot' de la tabla
+            if gasto.moneda and gasto.moneda.upper() != 'USD':
+                # Aseguramos que la cotización no sea nula o cero
+                if gasto.cot and float(gasto.cot) > 0:
+                    importe_convertido = importe_gasto / float(gasto.cot)
+                else:
+                    # Si no hay cotización válida, usamos el importe original
+                    importe_convertido = importe_gasto
+            else:
+                importe_convertido = importe_gasto
+
+            if id_referencia not in movimientos_agrupados:
+                movimientos_agrupados[id_referencia] = {
+                    'importe_total': 0,
+                    'fecha': None,
+                    'tipo': tipo,
+                    'n_factura': gasto.n_factura,
+                    'detalle': gasto.detalle
+                }
+            
+            # Lógica para la fecha
+            # Usamos el atributo 'fecha_de_pago' que está mapeado en tu modelo
+            if tipo == 'Sale por financiera' and gasto.fecha_de_pago:
+                movimientos_agrupados[id_referencia]['fecha'] = gasto.fecha_de_pago.strftime('%Y-%m-%d')
+            elif tipo == 'Ingresa a la financiera':
+                movimientos_agrupados[id_referencia]['fecha'] = gasto.fecha_del_gasto.strftime('%Y-%m-%d')
+
+            # Sumamos o restamos el importe según el tipo de movimiento
+            if tipo == 'Sale por financiera':
+                movimientos_agrupados[id_referencia]['importe_total'] -= importe_convertido
+            else:
+                movimientos_agrupados[id_referencia]['importe_total'] += importe_convertido
+        
+        # ✅ Paso 3: Formatear la respuesta para el frontend
+        resultados = []
+        for id_referencia, datos in movimientos_agrupados.items():
+            importe_formateado = round(datos['importe_total'], 2) if datos['importe_total'] is not None else 0
+            
+            if datos['tipo'] == 'Sale por financiera':
+                concepto = 'Nro de caja'
+                presupuesto_nro = id_referencia
+                invoice = ''
+            else:
+                concepto = 'Presupuesto Nro'
+                presupuesto_nro = ''
+                invoice = datos.get('n_factura', '') # ✅ Usamos .get para manejar valores nulos
+
+            resultados.append({
+                'fecha': datos['fecha'] if datos['fecha'] is not None else '', # ✅ Manejamos fecha nula
+                'concepto': concepto,
+                'presupuesto_nro': presupuesto_nro,
+                'invoice': invoice,
+                'importe': importe_formateado,
+                'comision_porcentaje': 0,
+                'comision_importe': 0,
+                'gastos_bancarios': 0,
+                'saldo': 0
+            })
+            
+        # ✅ Ordenamos los resultados por fecha y luego por presupuesto_nro
+        resultados.sort(key=lambda x: (x['fecha'] if x['fecha'] else '9999-12-31', x['presupuesto_nro'] if x['presupuesto_nro'] else 9999999))
+
+        return jsonify({'data': resultados}), 200
+
+    except Exception as e:
+        print(f"Error al obtener el saldo de la financiera: {e}")
+        return jsonify({'error': 'Error interno del servidor.'}), 500
+
+
+
+
+
+
+
+
+
+
+
 
 
 @app.route("/produccion")
@@ -993,9 +1174,3 @@ def lapampa():
         return redirect(url_for('main'))
     return render_template("la-pampa.html")
 
-
-if __name__ == "__main__":
-    with app.app_context():
-        # Crea las tablas si no existen, esto funciona tanto para SQLite como para MySQL
-        db.create_all()
-    app.run(debug=True)

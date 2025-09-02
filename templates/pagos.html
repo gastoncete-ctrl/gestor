@@ -543,7 +543,7 @@
             <a href="/main">Menú principal</a>
             <a href="/gastos">Registro de Gastos</a>
             <a href="/pagos" class="active">Pagos</a>
-            <a href="/estructuras">Gestión de Estructuras</a>
+            <a href="/finanzas">Finanzas</a>
             <a href="/proveedores">Gestión de Proveedores</a>
         </nav>
         <div class="user-info">
@@ -559,11 +559,14 @@
             </div>
             <div class="filter-and-cotizacion">
                 <div class="filter-buttons">
-                    <button id="btn-pendiente">Pendientes</button>
-                    <button id="btn-pagado">Pagados</button>
-                    <button id="btn-todo">Ver todos</button>
-                        <button id="btn-filtros">Filtros</button>
+                    <button id="btn-pendiente" class="filter-btn">Pendientes</button>
+                    <button id="btn-pagado" class="filter-btn">Pagados</button>
+                    <button id="btn-todo" class="filter-btn">Ver todos</button>
+                    <button id="btn-filtros" class="filter-btn active">Filtros</button>
                 </div>
+                    <div class="filter-buttons">
+                        <button id="btn-descargar-csv">Descargar CSV</button>
+                    </div>
                 <div class="generar-orden-btn-group">
                     <button id="generar-orden-btn" class="action-btn">
                         <i class="fas fa-file-invoice"></i> Generar Orden de Pago
@@ -687,6 +690,28 @@
 
 
     <script>
+        let allGastos = []; // Declara la variable de forma global
+        let allProveedores = [];
+
+        // ✅ Variable para guardar el estado del filtro, iniciada con el valor por defecto 'todo'.
+        let currentFilter = 'todo';
+
+        // ✅ Esta función es llamada desde el addEventListener para actualizar la tabla y el filtro global.
+        const cargarPagos = async (page = 1, estado = 'todo', per_page = 16) => {
+            try {
+                const response = await fetch(`/api/gastos_pagos?page=${page}&per_page=${per_page}&estado=${estado}`);
+                const data = await response.json();
+                
+                // ... (Tu código para llenar la tabla)
+                
+                // Actualizamos la variable global con el estado actual
+                currentFilter = estado;
+                
+            } catch (error) {
+                console.error('Error al cargar pagos:', error);
+                mostrarMensaje('Error al cargar los datos.', 'error');
+            }
+        };
         function mostrarMensaje(mensaje, tipo = 'success') {
             const mensajeBox = document.getElementById('mensaje-box');
             const mensajeTexto = document.getElementById('mensaje-texto');
@@ -707,7 +732,68 @@
             const btnPendiente = document.getElementById('btn-pendiente');
             const btnPagado = document.getElementById('btn-pagado');
             const btnTodo = document.getElementById('btn-todo');
-                        const btnFiltros = document.getElementById('btn-filtros');
+            const btnFiltros = document.getElementById('btn-filtros');
+            const filterButtons = document.querySelectorAll('.filter-buttons .filter-btn');
+    
+            // Asignamos el evento de clic a todos los botones de filtro
+            filterButtons.forEach(button => {
+                button.addEventListener('click', (event) => {
+                    // Elimina la clase 'active' de todos los botones de filtro
+                    filterButtons.forEach(btn => btn.classList.remove('active'));
+                    // Agrega la clase 'active' solo al botón que se clicó
+                    event.target.classList.add('active');
+                    
+                    // Obtiene el estado del botón clicado (pendiente, pagado, todo)
+                    const estado = event.target.id.replace('btn-', '');
+                    
+                    // Llama a la función que actualiza la tabla y el filtro global
+                    cargarPagos(1, estado);
+                });
+            });    
+            // ✅ Esta función ahora solo convierte los datos que le das en un archivo CSV.
+            const descargarCSV = (data, filename) => {
+                const headers = ["ID", "Fecha", "Detalle", "Estructura", "Subestructura", "Importe", "Semana Consumo", "Fecha Pago", "Semana Pago", "Orden", "Estado", "Proveedor", "Informe", "Moneda", "Cotización", "Total", "Factura"];
+                const csvRows = [];
+                csvRows.push(headers.join(','));
+
+                // ✅ La clave es usar los datos que se pasan como parámetro (data)
+                for (const gasto of data) {
+                    const estado = gasto.id_orden ? 'Pagado' : 'Pendiente';
+                    const total = parseFloat(gasto.importe) * parseFloat(gasto.cot);
+                    
+                    const rowData = [
+                        gasto.id_gastos,
+                        gasto.fecha_del_gasto ? gasto.fecha_del_gasto : '',
+                        `"${(gasto.detalle || '').replace(/"/g, '""')}"`,
+                        `"${(gasto.estructura || '').replace(/"/g, '""')}"`,
+                        `"${(gasto.subestructura || '').replace(/"/g, '""')}"`,
+                        gasto.importe,
+                        gasto.n_de_semana_del_consumo || '',
+                        gasto.fecha_de_pago ? gasto.fecha_de_pago : '',
+                        gasto.numero_de_semana_del_pago || '',
+                        gasto.id_orden || '',
+                        estado,
+                        `"${(gasto.proveedor || '').replace(/"/g, '""')}"`,
+                        `"${(gasto.informe || '').replace(/"/g, '""')}"`,
+                        gasto.moneda || '',
+                        gasto.cot,
+                        total,
+                        gasto.url || ''
+                    ];
+                    csvRows.push(rowData.join(','));
+                }
+
+                const csvString = csvRows.join('\n');
+                const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a");
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
 
             const filtrosModal = document.getElementById('filtros-modal');
             const closeBtn = filtrosModal.querySelector('.close-btn');
@@ -783,7 +869,7 @@
                     <td data-field="numero_de_semana_del_pago" data-value="${gasto.semana_pago || ''}">${gasto.semana_pago || ''}</td>
                     <td data-field="id_orden" data-value="${gasto.orden_pago || ''}">${gasto.orden_pago || ''}</td>
                     <td data-field="estado" data-value="${gasto.estado || ''}">${gasto.estado || ''}</td>
-                    <td>${gasto.proveedor || ''}</td>
+                    <td data-field="proveedor" data-value="${gasto.id_proveedor || ''}" data-value="${gasto.proveedor || ''}">${gasto.proveedor || ''}</td>
                     <td data-field="informe" data-value="${gasto.informe || ''}">${gasto.informe || ''}</td>
                     <td data-field="moneda" data-value="${gasto.moneda || ''}">${gasto.moneda || ''}</td>
                     <td data-field="cotizacion" data-value="${cotizacion !== null ? cotizacion : ''}">${formatNumber(cotizacion)}</td>
@@ -887,6 +973,20 @@
                 }
             };
 
+            const fetchProveedores = async () => {
+                try {
+                    const response = await fetch('/api/proveedores');
+                    if (!response.ok) {
+                        throw new Error('Error al obtener la lista de proveedores.');
+                    }
+                    const data = await response.json();
+                    allProveedores = data.proveedores;
+                } catch (error) {
+                    console.error('Error al cargar proveedores:', error);
+                    mostrarMensaje('Error al cargar la lista de proveedores.', 'error');
+                }
+            };
+
             const handleEditClick = async (row) => {
                 const gastoId = row.dataset.gastoId;
                 const gasto = allGastos.find(g => g.id_gastos == gastoId);
@@ -932,6 +1032,21 @@
                                 <option value="Pagado" ${value === 'Pagado' ? 'selected' : ''}>Pagado</option>
                             </select>
                         `;
+                    } else if (field === 'proveedor') {
+                        const res = await fetch("/api/proveedores");
+                        const proveedores = await res.json();
+
+                        let selectHtml = `<select data-field="id_proveedor">`;  // 👈 mejor usar el id para guardar
+                        proveedores.forEach(p => {
+                            selectHtml += `
+                                <option value="${p.id_proveedor}" ${p.id_proveedor == gasto.id_proveedor ? 'selected' : ''}>
+                                    ${p.nombre_proveedores}
+                                </option>`;
+                        });
+                        selectHtml += `</select>`;
+                        inputHtml = selectHtml;
+                    
+                    
                     } else if (field === 'moneda') {
                          inputHtml = `
                             <select data-field="${field}">
@@ -1464,6 +1579,33 @@
                     mostrarMensaje('Error de conexión al confirmar orden.', 'error');
                 }
             });
+
+
+            // ✅ Código para el botón de descarga
+            document.getElementById('btn-descargar-csv').addEventListener('click', async () => {
+                try {
+                    // ✅ Elimina los filtros y hace una llamada directa para obtener todos los gastos
+                    const response = await fetch('/api/gastos_pagos/all');
+
+                    if (!response.ok) {
+                        throw new Error('Error en la respuesta del servidor.');
+                    }
+                    
+                    const data = await response.json();
+                    const allGastosToDownload = data.gastos;
+
+                    if (allGastosToDownload.length > 0) {
+                        // Llama a la función que convierte los datos a CSV y los descarga
+                        descargarCSV(allGastosToDownload, 'todos_los_pagos.csv');
+                    } else {
+                        alert('No hay datos para descargar.');
+                    }
+                } catch (error) {
+                    console.error('Error al descargar los datos:', error);
+                    alert('Ocurrió un error al intentar descargar los datos.');
+                }
+            });
+
 
             cargarPagos();
         });

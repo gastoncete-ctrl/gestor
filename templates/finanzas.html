@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <title>Saldo de la Financiera</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400;700&display=swap');
+        body {
+            font-family: 'Roboto Condensed', sans-serif;
+            background-image: url('{{ url_for('static', filename='fondo3.png') }}');
+            margin: 0;
+            padding: 0;
+            background-attachment: fixed;
+            background-size: cover;
+        }
+        .header {
+            background-color: white;
+            padding: 16px 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header .logo img { height: 40px; }
+        .header-menu { display: flex; gap: 20px; }
+        .header-menu a {
+            text-decoration: none;
+            color: #555;
+            font-weight: 700;
+            font-size: 1.1em;
+            padding: 8px 12px;
+            border-radius: 8px;
+            transition: background-color 0.2s;
+        }
+        .header-menu a:hover { background-color: #f0f0f0; }
+        .container {
+            max-width: 95%;
+            margin: 20px auto;
+            background-color: white;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 24px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+            text-align: left;
+        }
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f4f4f4;
+            color: #555;
+            text-transform: uppercase;
+        }
+        tr:hover { background-color: #f9f9f9; }
+        .positive { color: green; font-weight: bold; }
+        .negative { color: red; font-weight: bold; }
+        input[type="number"] {
+            width: 80px;
+            padding: 5px;
+            text-align: center;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+        </div>
+        <nav class="header-menu">
+            <a href="/main">Menú principal</a>
+            <a href="/gastos">Registro de Gastos</a>
+            <a href="{{ url_for('pagos') }}">Pagos</a>
+            <a href="{{ url_for('finanzas') }} class="active"">Finanzas</a>
+        </nav>
+    </header>
+
+    <div class="container">
+        <h1>Saldo de la Financiera</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Concepto</th>
+                    <th>Presupuesto Nro</th>
+                    <th>Invoice</th>
+                    <th>Importe</th>
+                    <th>% de comisión</th>
+                    <th>Comisión</th>
+                    <th>Gastos bancarios</th>
+                    <th>Saldo</th>
+                </tr>
+            </thead>
+            <tbody id="finanzas-table-body">
+                </tbody>
+        </table>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const tableBody = document.getElementById('finanzas-table-body');
+            let saldoActual = 0;
+
+            const calcularSaldo = () => {
+                const rows = tableBody.querySelectorAll('tr');
+                let saldoAcumulado = 0;
+
+                rows.forEach(row => {
+                    const importe = parseFloat(row.querySelector('[data-col="importe"]').textContent) || 0;
+                    const comision = parseFloat(row.querySelector('[data-col="comision"]').textContent) || 0;
+                    const gastosBancarios = parseFloat(row.querySelector('[data-col="gastos_bancarios"]').value) || 0;
+
+                    saldoAcumulado += importe + comision + gastosBancarios;
+                    
+                    const saldoCelda = row.querySelector('[data-col="saldo"]');
+                    saldoCelda.textContent = saldoAcumulado.toLocaleString('es-AR', { style: 'currency', currency: 'USD' });
+                    saldoCelda.classList.remove('positive', 'negative');
+                    if (saldoAcumulado >= 0) {
+                        saldoCelda.classList.add('positive');
+                    } else {
+                        saldoCelda.classList.add('negative');
+                    }
+                });
+            };
+
+            const recalcularComision = (row, importe) => {
+                const porcentajeInput = row.querySelector('[data-col="comision_porcentaje"]');
+                const comisionCelda = row.querySelector('[data-col="comision"]');
+                const porcentaje = parseFloat(porcentajeInput.value) || 0;
+                const comision = (importe * porcentaje) / 100;
+                comisionCelda.textContent = comision.toFixed(2);
+                calcularSaldo();
+            };
+
+            const cargarDatos = async () => {
+                try {
+                    const response = await fetch('/api/finanzas/saldo_financiera');
+                    if (!response.ok) {
+                        throw new Error('Error al cargar los datos.');
+                    }
+                    const data = await response.json();
+                    
+                    if (data.data && data.data.length > 0) {
+                        tableBody.innerHTML = ''; // Limpiar la tabla antes de llenar
+                        data.data.forEach(item => {
+                            const row = document.createElement('tr');
+
+                            // Celda de Importe
+                            const importeCelda = document.createElement('td');
+                            importeCelda.setAttribute('data-col', 'importe');
+                            importeCelda.textContent = item.importe.toFixed(2);
+                            if (item.importe >= 0) {
+                                importeCelda.classList.add('positive');
+                            } else {
+                                importeCelda.classList.add('negative');
+                            }
+
+                            // Celda de Comisión y Gastos Bancarios
+                            const comisionPorcentajeCelda = document.createElement('td');
+                            const comisionCelda = document.createElement('td');
+                            const gastosBancariosCelda = document.createElement('td');
+
+                            if (item.tipo === 'Ingresa a la financiera') {
+                                const comisionInput = document.createElement('input');
+                                comisionInput.type = 'number';
+                                comisionInput.setAttribute('data-col', 'comision_porcentaje');
+                                comisionInput.value = item.comision_porcentaje;
+                                comisionInput.addEventListener('input', () => recalcularComision(row, item.importe));
+                                comisionPorcentajeCelda.appendChild(comisionInput);
+
+                                comisionCelda.setAttribute('data-col', 'comision');
+                                comisionCelda.textContent = item.comision_importe.toFixed(2);
+
+                                const gastosBancariosInput = document.createElement('input');
+                                gastosBancariosInput.type = 'number';
+                                gastosBancariosInput.setAttribute('data-col', 'gastos_bancarios');
+                                gastosBancariosInput.value = item.gastos_bancarios;
+                                gastosBancariosInput.addEventListener('input', calcularSaldo);
+                                gastosBancariosCelda.appendChild(gastosBancariosInput);
+                            } else {
+                                comisionPorcentajeCelda.textContent = '-';
+                                comisionCelda.textContent = '-';
+                                gastosBancariosCelda.textContent = '-';
+                            }
+                            
+                            row.innerHTML = `
+                                <td>${item.fecha}</td>
+                                <td>${item.concepto}</td>
+                                <td>${item.presupuesto_nro}</td>
+                                <td>${item.invoice}</td>
+                            `;
+                            row.appendChild(importeCelda);
+                            row.appendChild(comisionPorcentajeCelda);
+                            row.appendChild(comisionCelda);
+                            row.appendChild(gastosBancariosCelda);
+                            
+                            const saldoCelda = document.createElement('td');
+                            saldoCelda.setAttribute('data-col', 'saldo');
+                            row.appendChild(saldoCelda);
+
+                            tableBody.appendChild(row);
+                        });
+                        calcularSaldo();
+                    }
+                } catch (error) {
+                    console.error("Error al cargar los datos:", error);
+                    alert("Ocurrió un error al cargar los datos financieros.");
+                }
+            };
+
+            cargarDatos();
+        });
+    </script>
+</body>
+</html>
