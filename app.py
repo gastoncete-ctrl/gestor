@@ -286,30 +286,25 @@ TOKEN_FILE = os.environ.get('TOKEN_FILE')
 
 def get_drive_service():
     creds = None
-    print(f"DEBUG: Valor de la variable: {os.environ.get('GOOGLE_DRIVE_TOKEN_JSON')}") # <-- AGREGA ESTA LÍNEA
-
+    
     # Intenta cargar las credenciales del token de la variable de entorno
-    if 'GOOGLE_DRIVE_CREDENTIALS_JSON' in os.environ:
+    if 'GOOGLE_DRIVE_TOKEN_JSON' in os.environ:
         token_data = json.loads(os.environ.get('GOOGLE_DRIVE_TOKEN_JSON'))
         creds = Credentials.from_authorized_user_info(info=token_data, scopes=SCOPES)
-        print(f"Valor de la variable: {os.environ.get('GOOGLE_DRIVE_TOKEN_JSON')}") # <-- AGREGA ESTA LÍNEA
-
     
-    # Si no se pudo cargar el token de la variable de entorno o no es válido,
-    # intenta el flujo local para obtener uno nuevo.
+    # Si no se pudo cargar el token, asume un entorno local
     if not creds or not creds.valid:
-        # Aquí, el código solo se ejecutará en un entorno local con navegador.
-        # En la nube, esta parte del código nunca se alcanzará si la variable de entorno está bien configurada.
-        if os.path.exists('client_secret.json'):
+        if os.path.exists('token.json'):
+            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+        else:
             flow = InstalledAppFlow.from_client_secrets_file('client_secret.json', SCOPES)
             creds = flow.run_local_server(port=0)
-            
-            # Guarda el nuevo token localmente para el futuro
-            with open('token.json', 'w') as token:
-                token.write(creds.to_json())
-        else:
-            # Si no hay token en la nube ni archivo local, la aplicación no puede autenticarse
-            raise RuntimeError("Google Drive token not found.")
+
+        # Guarda el token para usarlo en el futuro
+        with open('token.json', 'w') as token:
+            token.write(creds.to_json())
             
     return build('drive', 'v3', credentials=creds)
 
