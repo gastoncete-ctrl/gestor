@@ -96,8 +96,7 @@
                 <tr>
                     <th>Fecha</th>
                     <th>Concepto</th>
-                    <th>Presupuesto Nro</th>
-                    <th>Invoice</th>
+                    <th>Presupuesto Nro/Invoice</th>
                     <th>Importe</th>
                     <th>% de comisión</th>
                     <th>Comisión</th>
@@ -156,8 +155,7 @@
                             row.innerHTML = `
                                 <td>${item.fecha}</td>
                                 <td>${item.concepto}</td>
-                                <td>${item.presupuesto_nro || ''}</td>
-                                <td>${item.invoice || ''}</td>
+                                <td>${item.presupuesto_invoice || ''}</td>
                                 <td class="${importe >= 0 ? 'positive' : 'negative'}">
                                     ${importe.toLocaleString('es-AR', { style: 'currency', currency: 'USD' })}
                                 </td>

@@ -1069,6 +1069,17 @@ def finanzas():
 
 
 
+Claro, lo haré de esa manera para simplificar la tabla.
+
+Para lograrlo, necesitamos actualizar tanto el backend (el archivo app.py) como el frontend (el archivo finanzas.html) para que trabajen juntos.
+
+Cambios en el backend (app.py)
+He modificado la función get_saldo_financiera() para que ahora devuelva un solo campo llamado presupuesto_invoice. Este campo se llena con el id_orden si el gasto es de tipo "Sale por financiera" o con el n_factura si es de tipo "Ingresa a la financiera".
+
+Reemplaza la función en tu archivo app.py con el siguiente código:
+
+Python
+
 @app.route('/api/finanzas/saldo_financiera', methods=['GET'])
 def get_saldo_financiera():
     try:
@@ -1089,7 +1100,7 @@ def get_saldo_financiera():
             # Aseguramos que el importe no sea nulo antes de la conversión
             importe_gasto = float(gasto.importe) if gasto.importe is not None else 0
 
-            # ✅ Lógica de conversión de moneda usando el campo 'cot' de la tabla
+            # ✅ Lógica de conversión de moneda
             if gasto.moneda and gasto.moneda.upper() != 'USD':
                 if gasto.cot and float(gasto.cot) > 0:
                     importe_convertido = importe_gasto / float(gasto.cot)
@@ -1097,17 +1108,24 @@ def get_saldo_financiera():
                     importe_convertido = importe_gasto
             else:
                 importe_convertido = importe_gasto
+            
+            # ✅ NUEVA LÓGICA para el campo combinado
+            if tipo == 'Ingresa a la financiera':
+                # El campo combinado es el n_factura
+                presupuesto_invoice_valor = gasto.n_factura
+            else:
+                # El campo combinado es el id_orden
+                presupuesto_invoice_valor = gasto.id_orden
 
             if id_referencia not in movimientos_agrupados:
                 movimientos_agrupados[id_referencia] = {
                     'importe_total': 0,
                     'fecha': None,
                     'tipo': tipo,
-                    'n_factura': gasto.n_factura,
                     'detalle': gasto.detalle,
-                    # ✅ Nuevos campos
                     'comision_porcentaje': gasto.percent_comision,
-                    'gastos_bancarios': gasto.gastos_bancarios
+                    'gastos_bancarios': gasto.gastos_bancarios,
+                    'presupuesto_invoice': presupuesto_invoice_valor # ✅ Nuevo campo
                 }
             
             # Lógica para la fecha
@@ -1116,7 +1134,7 @@ def get_saldo_financiera():
             elif tipo == 'Ingresa a la financiera':
                 movimientos_agrupados[id_referencia]['fecha'] = gasto.fecha_del_gasto.strftime('%Y-%m-%d')
 
-            # Sumamos o restamos el importe según el tipo de movimiento
+            # Sumamos o restamos el importe
             if tipo == 'Sale por financiera':
                 movimientos_agrupados[id_referencia]['importe_total'] -= importe_convertido
             else:
@@ -1128,24 +1146,16 @@ def get_saldo_financiera():
             if datos['importe_total'] != 0:
                 importe_formateado = round(datos['importe_total'], 2)
                 
-                # ✅ Lógica para determinar el concepto, presupuesto e invoice
-                if datos['tipo'] == 'Ingresa a la financiera':
-                    concepto = 'Aporte'
-                    presupuesto_nro = datos['detalle']
-                    invoice = ''
-                else:
-                    concepto = 'Presupuesto Nro'
-                    presupuesto_nro = ''
-                    invoice = datos.get('n_factura', '')
+                # ✅ Lógica para determinar el concepto
+                concepto = 'Aporte' if datos['tipo'] == 'Ingresa a la financiera' else 'Presupuesto Nro'
                 
                 resultados.append({
                     'fecha': datos['fecha'] if datos['fecha'] is not None else '',
                     'concepto': concepto,
-                    'presupuesto_nro': presupuesto_nro,
-                    'invoice': invoice,
                     'importe': importe_formateado,
                     'comision_porcentaje': datos['comision_porcentaje'],
                     'gastos_bancarios': datos['gastos_bancarios'],
+                    'presupuesto_invoice': datos['presupuesto_invoice']
                 })
         
         # ✅ Ordenamos los resultados por fecha
