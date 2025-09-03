@@ -85,7 +85,7 @@
             <a href="/main">Menú principal</a>
             <a href="/gastos">Registro de Gastos</a>
             <a href="{{ url_for('pagos') }}">Pagos</a>
-            <a href="{{ url_for('finanzas') }} class="active"">Finanzas</a>
+            <a href="{{ url_for('finanzas') }}" class="active">Finanzas</a>
         </nav>
     </header>
 
@@ -106,7 +106,7 @@
                 </tr>
             </thead>
             <tbody id="finanzas-table-body">
-                </tbody>
+            </tbody>
         </table>
     </div>
 
@@ -118,12 +118,11 @@
             const calcularSaldo = () => {
                 const rows = tableBody.querySelectorAll('tr');
                 let saldoAcumulado = 0;
-
                 rows.forEach(row => {
                     const importe = parseFloat(row.querySelector('[data-col="importe"]').textContent) || 0;
                     const comision = parseFloat(row.querySelector('[data-col="comision"]').textContent) || 0;
-                    const gastosBancarios = parseFloat(row.querySelector('[data-col="gastos_bancarios"]').value) || 0;
-
+                    const gastosBancarios = parseFloat(row.querySelector('[data-col="gastos_bancarios"]').textContent) || 0;
+                    
                     saldoAcumulado += importe + comision + gastosBancarios;
                     
                     const saldoCelda = row.querySelector('[data-col="saldo"]');
@@ -137,91 +136,52 @@
                 });
             };
 
-            const recalcularComision = (row, importe) => {
-                const porcentajeInput = row.querySelector('[data-col="comision_porcentaje"]');
-                const comisionCelda = row.querySelector('[data-col="comision"]');
-                const porcentaje = parseFloat(porcentajeInput.value) || 0;
-                const comision = (importe * porcentaje) / 100;
-                comisionCelda.textContent = comision.toFixed(2);
-                calcularSaldo();
-            };
-
             const cargarDatos = async () => {
                 try {
                     const response = await fetch('/api/finanzas/saldo_financiera');
-                    if (!response.ok) {
-                        throw new Error('Error al cargar los datos.');
-                    }
-                    const data = await response.json();
+                    const result = await response.json();
                     
-                    if (data.data && data.data.length > 0) {
-                        tableBody.innerHTML = ''; // Limpiar la tabla antes de llenar
-                        data.data.forEach(item => {
+                    if (response.ok) {
+                        tableBody.innerHTML = '';
+                        let saldoAcumulado = 0;
+                        result.data.forEach(item => {
                             const row = document.createElement('tr');
-
-                            // Celda de Importe
-                            const importeCelda = document.createElement('td');
-                            importeCelda.setAttribute('data-col', 'importe');
-                            importeCelda.textContent = item.importe.toFixed(2);
-                            if (item.importe >= 0) {
-                                importeCelda.classList.add('positive');
-                            } else {
-                                importeCelda.classList.add('negative');
-                            }
-
-                            // Celda de Comisión y Gastos Bancarios
-                            const comisionPorcentajeCelda = document.createElement('td');
-                            const comisionCelda = document.createElement('td');
-                            const gastosBancariosCelda = document.createElement('td');
-
-                            if (item.tipo === 'Ingresa a la financiera') {
-                                const comisionInput = document.createElement('input');
-                                comisionInput.type = 'number';
-                                comisionInput.setAttribute('data-col', 'comision_porcentaje');
-                                comisionInput.value = item.comision_porcentaje;
-                                comisionInput.addEventListener('input', () => recalcularComision(row, item.importe));
-                                comisionPorcentajeCelda.appendChild(comisionInput);
-
-                                comisionCelda.setAttribute('data-col', 'comision');
-                                comisionCelda.textContent = item.comision_importe.toFixed(2);
-
-                                const gastosBancariosInput = document.createElement('input');
-                                gastosBancariosInput.type = 'number';
-                                gastosBancariosInput.setAttribute('data-col', 'gastos_bancarios');
-                                gastosBancariosInput.value = item.gastos_bancarios;
-                                gastosBancariosInput.addEventListener('input', calcularSaldo);
-                                gastosBancariosCelda.appendChild(gastosBancariosInput);
-                            } else {
-                                comisionPorcentajeCelda.textContent = '-';
-                                comisionCelda.textContent = '-';
-                                gastosBancariosCelda.textContent = '-';
-                            }
+                            
+                            const importe = parseFloat(item.importe);
+                            const comision = (importe * (item.comision_porcentaje / 100)) || 0;
+                            const gastosBancarios = parseFloat(item.gastos_bancarios) || 0;
+                            
+                            saldoAcumulado += importe + comision + gastosBancarios;
                             
                             row.innerHTML = `
                                 <td>${item.fecha}</td>
                                 <td>${item.concepto}</td>
-                                <td>${item.presupuesto_nro}</td>
-                                <td>${item.invoice}</td>
+                                <td>${item.presupuesto_nro || ''}</td>
+                                <td>${item.invoice || ''}</td>
+                                <td class="${importe >= 0 ? 'positive' : 'negative'}">
+                                    ${importe.toLocaleString('es-AR', { style: 'currency', currency: 'USD' })}
+                                </td>
+                                <td>${item.comision_porcentaje || ''}%</td>
+                                <td class="${comision >= 0 ? 'positive' : 'negative'}">
+                                    ${comision.toLocaleString('es-AR', { style: 'currency', currency: 'USD' })}
+                                </td>
+                                <td class="${gastosBancarios >= 0 ? 'positive' : 'negative'}">
+                                    ${gastosBancarios.toLocaleString('es-AR', { style: 'currency', currency: 'USD' })}
+                                </td>
+                                <td class="${saldoAcumulado >= 0 ? 'positive' : 'negative'}">
+                                    ${saldoAcumulado.toLocaleString('es-AR', { style: 'currency', currency: 'USD' })}
+                                </td>
                             `;
-                            row.appendChild(importeCelda);
-                            row.appendChild(comisionPorcentajeCelda);
-                            row.appendChild(comisionCelda);
-                            row.appendChild(gastosBancariosCelda);
-                            
-                            const saldoCelda = document.createElement('td');
-                            saldoCelda.setAttribute('data-col', 'saldo');
-                            row.appendChild(saldoCelda);
 
                             tableBody.appendChild(row);
                         });
-                        calcularSaldo();
+                        
                     }
                 } catch (error) {
                     console.error("Error al cargar los datos:", error);
                     alert("Ocurrió un error al cargar los datos financieros.");
                 }
             };
-
             cargarDatos();
         });
     </script>
