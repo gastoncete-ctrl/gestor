@@ -92,6 +92,8 @@ class Gasto(db.Model):
     cot = db.Column('COT.', db.Float)
     url = db.Column('url', db.Text)
     tipo = db.Column('tipo_de_movimiento', db.String(12))
+    percent_comision = db.Column('percent_comision', db.Float)
+    gastos_bancarios = db.Column('gastos_bancarios', db.Float)    
 
     
     estructura = db.relationship('Estructura')
@@ -121,6 +123,8 @@ class Gasto(db.Model):
             "id_subestructura": self.id_subestructura,
             "subestructura": self.subestructura.subestructura if self.subestructura else None,
             "tipo_de_movimiento": self.tipo,
+            "percent_comision": self.percent_comision,
+            "gastos_bancarios": self.gastos_bancarios
         }
 
 
@@ -1068,7 +1072,7 @@ def finanzas():
 @app.route('/api/finanzas/saldo_financiera', methods=['GET'])
 def get_saldo_financiera():
     try:
-        # ✅ Paso 1: Obtener los gastos con el nuevo filtro condicional
+        # ✅ Paso 1: Obtener los gastos con los nuevos filtros
         gastos_financiera = db.session.query(Gasto).filter(
             or_(
                 Gasto.tipo == 'Ingresa a la financiera',
@@ -1087,11 +1091,9 @@ def get_saldo_financiera():
 
             # ✅ Lógica de conversión de moneda usando el campo 'cot' de la tabla
             if gasto.moneda and gasto.moneda.upper() != 'USD':
-                # Aseguramos que la cotización no sea nula o cero
                 if gasto.cot and float(gasto.cot) > 0:
                     importe_convertido = importe_gasto / float(gasto.cot)
                 else:
-                    # Si no hay cotización válida, usamos el importe original
                     importe_convertido = importe_gasto
             else:
                 importe_convertido = importe_gasto
@@ -1102,11 +1104,13 @@ def get_saldo_financiera():
                     'fecha': None,
                     'tipo': tipo,
                     'n_factura': gasto.n_factura,
-                    'detalle': gasto.detalle
+                    'detalle': gasto.detalle,
+                    # ✅ Nuevos campos
+                    'comision_porcentaje': gasto.percent_comision,
+                    'gastos_bancarios': gasto.gastos_bancarios
                 }
             
             # Lógica para la fecha
-            # Usamos el atributo 'fecha_de_pago' que está mapeado en tu modelo
             if tipo == 'Sale por financiera' and gasto.fecha_de_pago:
                 movimientos_agrupados[id_referencia]['fecha'] = gasto.fecha_de_pago.strftime('%Y-%m-%d')
             elif tipo == 'Ingresa a la financiera':
@@ -1117,35 +1121,35 @@ def get_saldo_financiera():
                 movimientos_agrupados[id_referencia]['importe_total'] -= importe_convertido
             else:
                 movimientos_agrupados[id_referencia]['importe_total'] += importe_convertido
-        
-        # ✅ Paso 3: Formatear la respuesta para el frontend
-        resultados = []
-        for id_referencia, datos in movimientos_agrupados.items():
-            importe_formateado = round(datos['importe_total'], 2) if datos['importe_total'] is not None else 0
-            
-            if datos['tipo'] == 'Sale por financiera':
-                concepto = 'Nro de caja'
-                presupuesto_nro = id_referencia
-                invoice = ''
-            else:
-                concepto = 'Presupuesto Nro'
-                presupuesto_nro = ''
-                invoice = datos.get('n_factura', '') # ✅ Usamos .get para manejar valores nulos
 
-            resultados.append({
-                'fecha': datos['fecha'] if datos['fecha'] is not None else '', # ✅ Manejamos fecha nula
-                'concepto': concepto,
-                'presupuesto_nro': presupuesto_nro,
-                'invoice': invoice,
-                'importe': importe_formateado,
-                'comision_porcentaje': 0,
-                'comision_importe': 0,
-                'gastos_bancarios': 0,
-                'saldo': 0
-            })
-            
-        # ✅ Ordenamos los resultados por fecha y luego por presupuesto_nro
-        resultados.sort(key=lambda x: (x['fecha'] if x['fecha'] else '9999-12-31', x['presupuesto_nro'] if x['presupuesto_nro'] else 9999999))
+        # ✅ Paso 3: Construir la respuesta final y enviarla
+        resultados = []
+        for id_ref, datos in movimientos_agrupados.items():
+            if datos['importe_total'] != 0:
+                importe_formateado = round(datos['importe_total'], 2)
+                
+                # ✅ Lógica para determinar el concepto, presupuesto e invoice
+                if datos['tipo'] == 'Ingresa a la financiera':
+                    concepto = 'Aporte'
+                    presupuesto_nro = datos['detalle']
+                    invoice = ''
+                else:
+                    concepto = 'Presupuesto Nro'
+                    presupuesto_nro = ''
+                    invoice = datos.get('n_factura', '')
+                
+                resultados.append({
+                    'fecha': datos['fecha'] if datos['fecha'] is not None else '',
+                    'concepto': concepto,
+                    'presupuesto_nro': presupuesto_nro,
+                    'invoice': invoice,
+                    'importe': importe_formateado,
+                    'comision_porcentaje': datos['comision_porcentaje'],
+                    'gastos_bancarios': datos['gastos_bancarios'],
+                })
+        
+        # ✅ Ordenamos los resultados por fecha
+        resultados.sort(key=lambda x: (x['fecha'] if x['fecha'] else '9999-12-31'))
 
         return jsonify({'data': resultados}), 200
 
