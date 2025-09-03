@@ -24,40 +24,107 @@
             justify-content: space-between;
             align-items: center;
         }
-        .header .logo img { height: 40px; }
-        .header-menu { display: flex; gap: 20px; }
+        .header .logo img {
+            height: 40px;
+        }
+        .header-menu {
+            display: flex;
+            gap: 20px;
+        }
         .header-menu a {
             text-decoration: none;
             color: #555;
-            font-weight: 700;
-            font-size: 1.1em;
+            font-weight: 500;
             padding: 8px 12px;
-            border-radius: 8px;
-            transition: background-color 0.2s;
+            border-radius: 6px;
+            transition: background-color 0.2s, color 0.2s;
         }
-        .header-menu a:hover { background-color: #f0f0f0; }
-        .container {
-            max-width: 95%;
+        .header-menu a:hover {
+            background-color: #e0e0e0;
+            color: #1a1a1a;
+        }
+        .header-menu a.active {
+            background-color: #d1d1d1;
+            color: #1a1a1a;
+            font-weight: 600;
+        }
+        
+        .page-content {
+            display: flex;
+            width: 95%;
             margin: 20px auto;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .main-content {
+            flex-grow: 1;
+            flex-basis: 65%; 
             background-color: white;
             padding: 24px;
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
+
         h1 {
             text-align: center;
             color: #333;
             margin-bottom: 24px;
         }
+        
+        .filtro-container {
+            text-align: center;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .filtro-container label {
+            font-weight: bold;
+            color: #555;
+        }
+
+        .filtro-container select {
+            padding: 10px 35px 10px 15px;
+            min-width: 150px; /* Nuevo: Define un ancho mínimo para los selects */
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+            font-family: 'Roboto Condensed', sans-serif;
+            font-size: 1em;
+            color: #333;
+            outline: none;
+            transition: all 0.3s ease;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="%23333" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"%3e%3cpath d="M6 9l6 6 6-6"/%3e%3c/svg%3e');
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+        }
+
+        .filtro-container select:hover {
+            border-color: #a0a0a0;
+        }
+
+        .filtro-container select:focus {
+            border-color: #a3a3a3ff;
+            box-shadow: 0 0 5px rgba(103, 103, 103, 0.5);
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.9em;
             text-align: left;
+            table-layout: fixed;
         }
         th, td {
-            padding: 12px;
+            padding: 16px;
             border-bottom: 1px solid #ddd;
+            word-wrap: break-word;
         }
         th {
             background-color: #f4f4f4;
@@ -67,12 +134,54 @@
         tr:hover { background-color: #f9f9f9; }
         .positive { color: green; font-weight: bold; }
         .negative { color: red; font-weight: bold; }
+        
+        .text-right {
+            text-align: right;
+        }
+
         input[type="number"] {
             width: 80px;
             padding: 5px;
             text-align: center;
             border: 1px solid #ccc;
             border-radius: 4px;
+        }
+        
+        .charts-container {
+            width: 250px; /* Reducir el ancho de 350px a 250px */
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .chart-box {
+            background-color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-title {
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .user-info span {
+            font-weight: 500;
+            color: #555;
+        }
+        .user-info a {
+            text-decoration: none;
+            color: white;
+            background-color: #dc3545;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -84,104 +193,259 @@
         <nav class="header-menu">
             <a href="/main">Menú principal</a>
             <a href="/gastos">Registro de Gastos</a>
-            <a href="{{ url_for('pagos') }}">Pagos</a>
-            <a href="{{ url_for('finanzas') }}" class="active">Finanzas</a>
+            <a href="/pagos">Pagos</a>
+            <a href="/finanzas" class="active">Finanzas</a>
+            <a href="/proveedores">Gestión de Proveedores</a>
         </nav>
+        <div class="user-info">
+            <span>¡Bienvenido al gestor de KesslerKosher!</span>
+            <a href="/logout">Cerrar Sesión</a>
+        </div>
     </header>
 
-    <div class="container">
-        <h1>Saldo de la Financiera</h1>
-        <table>
-            <thead>
-                <tr>
-                    <th>Fecha</th>
-                    <th>Concepto</th>
-                    <th>Presupuesto Nro/Invoice</th>
-                    <th>Importe</th>
-                    <th>% de comisión</th>
-                    <th>Comisión</th>
-                    <th>Gastos bancarios</th>
-                    <th>Saldo</th>
-                </tr>
-            </thead>
-            <tbody id="finanzas-table-body">
-            </tbody>
-        </table>
+    <div class="page-content">
+        <div class="main-content">
+            <h1>Saldo de la Financiera</h1>
+
+            <div class="filtro-container">
+                <label for="filtro-tipo">Tipo de filtro:</label>
+                <select id="filtro-tipo">
+                    <option value="mensual">Mensual</option>
+                    <option value="trimestral">Trimestral</option>
+                    <option value="anual">Anual</option>
+                </select>
+                <select id="mes-filtro">
+                    <option value="1">Enero</option>
+                    <option value="2">Febrero</option>
+                    <option value="3">Marzo</option>
+                    <option value="4">Abril</option>
+                    <option value="5">Mayo</option>
+                    <option value="6">Junio</option>
+                    <option value="7">Julio</option>
+                    <option value="8">Agosto</option>
+                    <option value="9">Septiembre</option>
+                    <option value="10">Octubre</option>
+                    <option value="11">Noviembre</option>
+                    <option value="12">Diciembre</option>
+                </select>
+                <select id="trimestre-filtro" style="display:none;">
+                    <option value="1">Trimestre 1 (Ene-Mar)</option>
+                    <option value="2">Trimestre 2 (Abr-Jun)</option>
+                    <option value="3">Trimestre 3 (Jul-Sep)</option>
+                    <option value="4">Trimestre 4 (Oct-Dic)</option>
+                </select>
+                <select id="anio-filtro"></select>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Concepto</th>
+                        <th>Presupuesto Nro/Invoice</th>
+                        <th class="text-right">Importe</th>
+                        <th class="text-right">% de comisión</th>
+                        <th class="text-right">Comisión</th>
+                        <th class="text-right">Gastos bancarios</th>
+                        <th class="text-right">Saldo</th>
+                    </tr>
+                </thead>
+                <tbody id="finanzas-table-body">
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="charts-container">
+            <div class="chart-box">
+                <p class="chart-title">Saldo del Período Filtrado</p>
+                <canvas id="periodo-chart"></canvas>
+            </div>
+            <div class="chart-box">
+                <p class="chart-title">Saldo Acumulado Total</p>
+                <canvas id="total-chart"></canvas>
+            </div>
+        </div>
     </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const tableBody = document.getElementById('finanzas-table-body');
-            let saldoActual = 0;
+        const tableBody = document.getElementById('finanzas-table-body');
+        const filtroTipo = document.getElementById('filtro-tipo');
+        const mesFiltro = document.getElementById('mes-filtro');
+        const trimestreFiltro = document.getElementById('trimestre-filtro');
+        const anioFiltro = document.getElementById('anio-filtro');
+        const periodoChartCanvas = document.getElementById('periodo-chart').getContext('2d');
+        const totalChartCanvas = document.getElementById('total-chart').getContext('2d');
 
-            const calcularSaldo = () => {
-                const rows = tableBody.querySelectorAll('tr');
-                let saldoAcumulado = 0;
-                rows.forEach(row => {
-                    const importe = parseFloat(row.querySelector('[data-col="importe"]').textContent) || 0;
-                    const comision = parseFloat(row.querySelector('[data-col="comision"]').textContent) || 0;
-                    const gastosBancarios = parseFloat(row.querySelector('[data-col="gastos_bancarios"]').textContent) || 0;
-                    
-                    saldoAcumulado += importe + comision + gastosBancarios;
-                    
-                    const saldoCelda = row.querySelector('[data-col="saldo"]');
-                    saldoCelda.textContent = saldoAcumulado.toLocaleString('es-AR', { style: 'currency', currency: 'USD' });
-                    saldoCelda.classList.remove('positive', 'negative');
-                    if (saldoAcumulado >= 0) {
-                        saldoCelda.classList.add('positive');
-                    } else {
-                        saldoCelda.classList.add('negative');
+        let periodoChart = null;
+        let totalChart = null;
+
+        const generarAnios = () => {
+            const anioActual = new Date().getFullYear();
+            for (let i = anioActual; i >= 2020; i--) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = i;
+                anioFiltro.appendChild(option);
+            }
+            anioFiltro.value = anioActual;
+        };
+
+        const renderizarGraficos = (ingresos, egresos, saldoTotal) => {
+            if (periodoChart) periodoChart.destroy();
+            if (totalChart) totalChart.destroy();
+
+            // Gráfico del período filtrado
+            periodoChart = new Chart(periodoChartCanvas, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Ingresos', 'Egresos'],
+                    datasets: [{
+                        data: [ingresos, egresos],
+                        backgroundColor: ['#4CAF50', '#F44336']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(tooltipItem) {
+                                    return `${tooltipItem.label}: $${tooltipItem.raw.toFixed(2)}`;
+                                }
+                            }
+                        }
                     }
-                });
-            };
-
-            const cargarDatos = async () => {
-                try {
-                    const response = await fetch('/api/finanzas/saldo_financiera');
-                    const result = await response.json();
-                    
-                    if (response.ok) {
-                        tableBody.innerHTML = '';
-                        let saldoAcumulado = 0;
-                        result.data.forEach(item => {
-                            const row = document.createElement('tr');
-                            
-                            const importe = parseFloat(item.importe);
-                            const comision = (importe * (item.comision_porcentaje / 100)) || 0;
-                            const gastosBancarios = parseFloat(item.gastos_bancarios) || 0;
-                            
-                            saldoAcumulado += importe + comision + gastosBancarios;
-                            
-                            row.innerHTML = `
-                                <td>${item.fecha}</td>
-                                <td>${item.concepto}</td>
-                                <td>${item.presupuesto_invoice || ''}</td>
-                                <td class="${importe >= 0 ? 'positive' : 'negative'}">
-                                    ${importe.toLocaleString('es-AR', { style: 'currency', currency: 'USD' })}
-                                </td>
-                                <td>${item.comision_porcentaje || ''}%</td>
-                                <td class="${comision >= 0 ? 'positive' : 'negative'}">
-                                    ${comision.toLocaleString('es-AR', { style: 'currency', currency: 'USD' })}
-                                </td>
-                                <td class="${gastosBancarios >= 0 ? 'positive' : 'negative'}">
-                                    ${gastosBancarios.toLocaleString('es-AR', { style: 'currency', currency: 'USD' })}
-                                </td>
-                                <td class="${saldoAcumulado >= 0 ? 'positive' : 'negative'}">
-                                    ${saldoAcumulado.toLocaleString('es-AR', { style: 'currency', currency: 'USD' })}
-                                </td>
-                            `;
-
-                            tableBody.appendChild(row);
-                        });
-                        
-                    }
-                } catch (error) {
-                    console.error("Error al cargar los datos:", error);
-                    alert("Ocurrió un error al cargar los datos financieros.");
                 }
-            };
+            });
+
+            // Gráfico del saldo total acumulado
+            const ingresosTotales = saldoTotal > 0 ? saldoTotal : 0;
+            const egresosTotales = saldoTotal < 0 ? Math.abs(saldoTotal) : 0;
+            totalChart = new Chart(totalChartCanvas, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Ingresos Totales', 'Egresos Totales'],
+                    datasets: [{
+                        data: [ingresosTotales, egresosTotales],
+                        backgroundColor: ['#4CAF50', '#F44336']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(tooltipItem) {
+                                    return `${tooltipItem.label}: $${tooltipItem.raw.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        };
+
+        const ajustarFiltrosVisibles = () => {
+            const tipo = filtroTipo.value;
+            mesFiltro.style.display = 'none';
+            trimestreFiltro.style.display = 'none';
+
+            if (tipo === 'mensual') {
+                mesFiltro.style.display = 'inline-block';
+            } else if (tipo === 'trimestral') {
+                trimestreFiltro.style.display = 'inline-block';
+            }
+        };
+
+        const cargarDatos = async () => {
+            const tipo = filtroTipo.value;
+            let mes = mesFiltro.value;
+            let anio = anioFiltro.value;
+
+            if (tipo === 'trimestral') {
+                mes = trimestreFiltro.value;
+            } else if (tipo === 'anual') {
+                mes = '';
+            }
+
+            try {
+                const url = `/api/finanzas/saldo_financiera?mes=${mes}&anio=${anio}&filtro_tipo=${tipo}`;
+                const response = await fetch(url);
+                const result = await response.json();
+                
+                if (response.ok) {
+                    tableBody.innerHTML = '';
+                    let saldoAcumulado = 0;
+                    result.data.forEach(item => {
+                        const importe = parseFloat(item.importe);
+                        const comision = (importe * (item.comision_porcentaje / 100)) * -1 || 0;
+                        const gastosBancarios = parseFloat(item.gastos_bancarios) * -1 || 0;
+                        
+                        saldoAcumulado += importe + comision + gastosBancarios;
+
+                        const comisionPorcentajeDisplay = item.comision_porcentaje ? `${item.comision_porcentaje}%` : '';
+                        const comisionDisplay = comision ? comision.toLocaleString('es-AR', { style: 'currency', currency: 'USD' }) : '';
+                        const gastosBancariosDisplay = gastosBancarios ? gastosBancarios.toLocaleString('es-AR', { style: 'currency', currency: 'USD' }) : '';
+                        
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${item.fecha}</td>
+                            <td>${item.concepto}</td>
+                            <td>${item.presupuesto_invoice || ''}</td>
+                            <td class="text-right ${importe >= 0 ? 'positive' : 'negative'}">
+                                ${importe.toLocaleString('es-AR', { style: 'currency', currency: 'USD' })}
+                            </td>
+                            <td class="text-right">${comisionPorcentajeDisplay}</td>
+                            <td class="text-right ${comision >= 0 ? 'positive' : 'negative'}">
+                                ${comisionDisplay}
+                            </td>
+                            <td class="text-right ${gastosBancarios >= 0 ? 'positive' : 'negative'}">
+                                ${gastosBancariosDisplay}
+                            </td>
+                            <td class="text-right ${saldoAcumulado >= 0 ? 'positive' : 'negative'}">
+                                ${saldoAcumulado.toLocaleString('es-AR', { style: 'currency', currency: 'USD' })}
+                            </td>
+                        `;
+
+                        tableBody.appendChild(row);
+                    });
+                    
+                    renderizarGraficos(result.ingresos_periodo, result.egresos_periodo, result.saldo_total);
+
+                } else {
+                    console.error("Error al cargar los datos:", result.error);
+                    alert(`Ocurrió un error: ${result.error}`);
+                }
+            } catch (error) {
+                console.error("Error al cargar los datos:", error);
+                alert("Ocurrió un error al cargar los datos financieros.");
+            }
+        };
+
+        const documentReady = () => {
+            generarAnios();
+            const hoy = new Date();
+            mesFiltro.value = hoy.getMonth() + 1;
             cargarDatos();
-        });
+
+            filtroTipo.addEventListener('change', () => {
+                ajustarFiltrosVisibles();
+                cargarDatos();
+            });
+            mesFiltro.addEventListener('change', cargarDatos);
+            trimestreFiltro.addEventListener('change', cargarDatos);
+            anioFiltro.addEventListener('change', cargarDatos);
+        };
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', documentReady);
+        } else {
+            documentReady();
+        }
     </script>
 </body>
 </html>

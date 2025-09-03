@@ -15,6 +15,14 @@ import csv
 from sqlalchemy import text
 from dotenv import load_dotenv
 from sqlalchemy import or_, and_ # Asegúrate de que esta línea esté al inicio del archivo
+from sqlalchemy.sql import extract  # ✅ Asegúrate de que esta línea esté presente
+from flask import jsonify, request
+from sqlalchemy import or_, and_, extract
+from sqlalchemy.sql import func
+import calendar
+
+
+
 
 # Cargar las variables de entorno del archivo .env
 load_dotenv()
@@ -1069,54 +1077,78 @@ def finanzas():
 
 
 
-Claro, lo haré de esa manera para simplificar la tabla.
-
-Para lograrlo, necesitamos actualizar tanto el backend (el archivo app.py) como el frontend (el archivo finanzas.html) para que trabajen juntos.
-
-Cambios en el backend (app.py)
-He modificado la función get_saldo_financiera() para que ahora devuelva un solo campo llamado presupuesto_invoice. Este campo se llena con el id_orden si el gasto es de tipo "Sale por financiera" o con el n_factura si es de tipo "Ingresa a la financiera".
-
-Reemplaza la función en tu archivo app.py con el siguiente código:
-
-Python
 
 @app.route('/api/finanzas/saldo_financiera', methods=['GET'])
 def get_saldo_financiera():
     try:
-        # ✅ Paso 1: Obtener los gastos con los nuevos filtros
-        gastos_financiera = db.session.query(Gasto).filter(
-            or_(
-                Gasto.tipo == 'Ingresa a la financiera',
-                and_(Gasto.tipo == 'Sale por financiera', Gasto.id_orden.isnot(None))
-            )
-        ).order_by(Gasto.fecha_del_gasto).all()
+        mes_param = request.args.get('mes')
+        anio_param = request.args.get('anio')
+        filtro_tipo = request.args.get('filtro_tipo')
+
+        # Si no hay parámetros, por defecto se usa el mes actual
+        if not filtro_tipo:
+            filtro_tipo = 'mensual'
+            hoy = datetime.now()
+            mes_param = str(hoy.month)
+            anio_param = str(hoy.year)
         
-        # ✅ Paso 2: Agrupar los gastos
+        mes = int(mes_param) if mes_param else None
+        anio = int(anio_param) if anio_param else None
+
+        # Consulta para los movimientos del periodo filtrado
+        query_filter = or_(
+            Gasto.tipo == 'Ingresa a la financiera',
+            and_(Gasto.tipo == 'Sale por financiera', Gasto.id_orden.isnot(None))
+        )
+        
+        # Lógica de filtro de fecha
+        fecha_filter_periodo = None
+        if filtro_tipo == 'mensual':
+            fecha_filter_periodo = and_(
+                or_(
+                    and_(Gasto.tipo == 'Ingresa a la financiera', extract('month', Gasto.fecha_del_gasto) == mes, extract('year', Gasto.fecha_del_gasto) == anio),
+                    and_(Gasto.tipo == 'Sale por financiera', extract('month', Gasto.fecha_de_pago) == mes, extract('year', Gasto.fecha_de_pago) == anio)
+                )
+            )
+        elif filtro_tipo == 'trimestral':
+            trimestres = {
+                1: [1, 2, 3],
+                2: [4, 5, 6],
+                3: [7, 8, 9],
+                4: [10, 11, 12]
+            }
+            meses_trimestre = trimestres.get(mes, [])
+            fecha_filter_periodo = and_(
+                or_(
+                    and_(Gasto.tipo == 'Ingresa a la financiera', extract('month', Gasto.fecha_del_gasto).in_(meses_trimestre), extract('year', Gasto.fecha_del_gasto) == anio),
+                    and_(Gasto.tipo == 'Sale por financiera', extract('month', Gasto.fecha_de_pago).in_(meses_trimestre), extract('year', Gasto.fecha_de_pago) == anio)
+                )
+            )
+        elif filtro_tipo == 'anual':
+            fecha_filter_periodo = and_(
+                or_(
+                    and_(Gasto.tipo == 'Ingresa a la financiera', extract('year', Gasto.fecha_del_gasto) == anio),
+                    and_(Gasto.tipo == 'Sale por financiera', extract('year', Gasto.fecha_de_pago) == anio)
+                )
+            )
+        
+        gastos_periodo = db.session.query(Gasto).filter(query_filter, fecha_filter_periodo).order_by(Gasto.fecha_del_gasto).all()
+        
+        # Lógica de conversión y cálculo para el período
+        ingresos_periodo = 0
+        egresos_periodo = 0
+        
         movimientos_agrupados = {}
-        for gasto in gastos_financiera:
+        for gasto in gastos_periodo:
             tipo = gasto.tipo
             id_referencia = gasto.id_orden if tipo == 'Sale por financiera' else gasto.id_gastos
             
-            # Aseguramos que el importe no sea nulo antes de la conversión
             importe_gasto = float(gasto.importe) if gasto.importe is not None else 0
-
-            # ✅ Lógica de conversión de moneda
-            if gasto.moneda and gasto.moneda.upper() != 'USD':
-                if gasto.cot and float(gasto.cot) > 0:
-                    importe_convertido = importe_gasto / float(gasto.cot)
-                else:
-                    importe_convertido = importe_gasto
-            else:
-                importe_convertido = importe_gasto
+            importe_convertido = importe_gasto / float(gasto.cot) if gasto.moneda and gasto.moneda.upper() != 'USD' and gasto.cot and float(gasto.cot) > 0 else importe_gasto
             
-            # ✅ NUEVA LÓGICA para el campo combinado
-            if tipo == 'Ingresa a la financiera':
-                # El campo combinado es el n_factura
-                presupuesto_invoice_valor = gasto.n_factura
-            else:
-                # El campo combinado es el id_orden
-                presupuesto_invoice_valor = gasto.id_orden
-
+            comision = (importe_convertido * (gasto.percent_comision / 100)) if gasto.percent_comision else 0
+            gastos_bancarios = float(gasto.gastos_bancarios) if gasto.gastos_bancarios else 0
+            
             if id_referencia not in movimientos_agrupados:
                 movimientos_agrupados[id_referencia] = {
                     'importe_total': 0,
@@ -1124,29 +1156,27 @@ def get_saldo_financiera():
                     'tipo': tipo,
                     'detalle': gasto.detalle,
                     'comision_porcentaje': gasto.percent_comision,
-                    'gastos_bancarios': gasto.gastos_bancarios,
-                    'presupuesto_invoice': presupuesto_invoice_valor # ✅ Nuevo campo
+                    'gastos_bancarios': gastos_bancarios,
+                    'presupuesto_invoice': gasto.n_factura if tipo == 'Ingresa a la financiera' else gasto.id_orden
                 }
             
-            # Lógica para la fecha
+            if tipo == 'Sale por financiera':
+                movimientos_agrupados[id_referencia]['importe_total'] -= importe_convertido
+                egresos_periodo += importe_convertido + comision + gastos_bancarios
+            else:
+                movimientos_agrupados[id_referencia]['importe_total'] += importe_convertido
+                ingresos_periodo += importe_convertido
+
             if tipo == 'Sale por financiera' and gasto.fecha_de_pago:
                 movimientos_agrupados[id_referencia]['fecha'] = gasto.fecha_de_pago.strftime('%Y-%m-%d')
             elif tipo == 'Ingresa a la financiera':
                 movimientos_agrupados[id_referencia]['fecha'] = gasto.fecha_del_gasto.strftime('%Y-%m-%d')
 
-            # Sumamos o restamos el importe
-            if tipo == 'Sale por financiera':
-                movimientos_agrupados[id_referencia]['importe_total'] -= importe_convertido
-            else:
-                movimientos_agrupados[id_referencia]['importe_total'] += importe_convertido
-
-        # ✅ Paso 3: Construir la respuesta final y enviarla
         resultados = []
         for id_ref, datos in movimientos_agrupados.items():
             if datos['importe_total'] != 0:
                 importe_formateado = round(datos['importe_total'], 2)
                 
-                # ✅ Lógica para determinar el concepto
                 concepto = 'Aporte' if datos['tipo'] == 'Ingresa a la financiera' else 'Presupuesto Nro'
                 
                 resultados.append({
@@ -1158,10 +1188,26 @@ def get_saldo_financiera():
                     'presupuesto_invoice': datos['presupuesto_invoice']
                 })
         
-        # ✅ Ordenamos los resultados por fecha
         resultados.sort(key=lambda x: (x['fecha'] if x['fecha'] else '9999-12-31'))
+        
+        # Consulta para el saldo total
+        total_ingresos = db.session.query(func.sum(Gasto.importe / Gasto.cot)).filter(Gasto.tipo == 'Ingresa a la financiera').scalar() or 0
+        total_egresos = db.session.query(func.sum(Gasto.importe / Gasto.cot)).filter(and_(Gasto.tipo == 'Sale por financiera', Gasto.id_orden.isnot(None))).scalar() or 0
+        total_comision = db.session.query(func.sum(Gasto.importe * (Gasto.percent_comision / 100))).filter(Gasto.tipo == 'Sale por financiera').scalar() or 0
+        total_gastos_bancarios = db.session.query(func.sum(Gasto.gastos_bancarios)).filter(Gasto.tipo == 'Sale por financiera').scalar() or 0
+        
+        saldo_total = total_ingresos - (total_egresos + total_comision + total_gastos_bancarios)
 
-        return jsonify({'data': resultados}), 200
+        # Preparamos la respuesta JSON
+        response_data = {
+            'data': resultados,
+            'saldo_periodo': round(ingresos_periodo - egresos_periodo, 2),
+            'saldo_total': round(saldo_total, 2),
+            'ingresos_periodo': round(ingresos_periodo, 2),
+            'egresos_periodo': round(egresos_periodo, 2)
+        }
+        
+        return jsonify(response_data), 200
 
     except Exception as e:
         print(f"Error al obtener el saldo de la financiera: {e}")
