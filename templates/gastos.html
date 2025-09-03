@@ -372,22 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const proveedorDatalist = document.getElementById('proveedores-list');
     const addProveedorBtn = document.getElementById('add-proveedor-btn');
 
-    // Nuevos elementos para los campos de financiera
-    const financialFields = document.getElementById('financial-fields');
-    const comisionInput = document.getElementById('comision');
-    const gastosBancariosInput = document.getElementById('gastos_bancarios');
-
-    // Evento para mostrar/ocultar los campos de comisión y gastos bancarios
-    tipoInput.addEventListener('change', () => {
-        if (tipoInput.value === 'Ingresa a la financiera') {
-            financialFields.style.display = 'block';
-        } else {
-            financialFields.style.display = 'none';
-            // Opcional: limpiar los valores cuando se ocultan los campos
-            comisionInput.value = '';
-            gastosBancariosInput.value = '';
-        }
-    });
+    
 
     let fileToUpload = null;
 
