@@ -20,6 +20,9 @@ from flask import jsonify, request
 from sqlalchemy import or_, and_, extract
 from sqlalchemy.sql import func
 import calendar
+from urllib.parse import urlparse
+from flask import Flask, jsonify, render_template
+from sqlalchemy import update, and_, or_ # Asegúrate de que `update` esté importado
 
 
 
@@ -38,6 +41,25 @@ from googleapiclient.discovery import build
 # Importa PyMySQL para que SQLAlchemy pueda usarlo
 import pymysql
 pymysql.install_as_MySQLdb()
+
+load_dotenv()
+
+
+DATABASE_URI = os.getenv('SQLALCHEMY_DATABASE_URI')
+
+if DATABASE_URI:
+    # Analizar la cadena de conexión para obtener los detalles
+    result = urlparse(DATABASE_URI)
+    DB_CONFIG = {
+        'user': result.username,
+        'password': result.password,
+        'host': result.hostname,
+        'database': result.path[1:],  # Ignora el '/' inicial
+    }
+else:
+    # Manejar el caso en que la variable de entorno no esté definida
+    DB_CONFIG = {}
+    print("Error: SQLALCHEMY_DATABASE_URI no está definida en el archivo .env")
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_ECHO'] = True
@@ -965,28 +987,31 @@ def aplicar_cotizacion():
         if cotizacion is None or cotizacion <= 0:
             return jsonify({"error": "La cotización debe ser un número positivo."}), 400
         
-        # Encuentra todos los gastos que son "pendientes" y tienen moneda "ARG"
-        # La condición para pendiente es que id_orden sea NULL o 0
-        gastos_a_actualizar = Gasto.query.filter(
-            Gasto.id_orden.is_(None) | (Gasto.id_orden == 0),
+        # Define la condición de los gastos a actualizar
+        condicion_gastos = and_(
+            or_(Gasto.id_orden.is_(None), Gasto.id_orden == 0),
             Gasto.moneda == 'ARG'
-        ).all()
-        
-        if not gastos_a_actualizar:
-            return jsonify({"error": "No hay gastos pendientes con moneda ARG para actualizar."}), 404
+        )
 
-        # Itera sobre los gastos y actualiza el campo 'cot'
-        for gasto in gastos_a_actualizar:
-            gasto.cot = cotizacion
-        
-        # Guarda los cambios en la base de datos
+        # Crea la consulta de actualización masiva
+        # Esta es la parte clave que reemplaza el bucle
+        stmt = update(Gasto).where(condicion_gastos).values(cot=cotizacion)
+
+        # Ejecuta la consulta directamente en la base de datos
+        db.session.execute(stmt)
+
+        # Confirma los cambios con un solo commit
         db.session.commit()
         
-        return jsonify({"success": f"Cotización {cotizacion} aplicada a {len(gastos_a_actualizar)} gastos pendientes."}), 200
+        # Opcional: Para saber cuántos registros se actualizaron,
+        # puedes hacer una consulta de conteo antes de la actualización
+        num_gastos = Gasto.query.filter(condicion_gastos).count()
+        
+        return jsonify({"success": f"Cotización {cotizacion} aplicada a {num_gastos} gastos pendientes."}), 200
 
     except Exception as e:
         print(f"Error al aplicar cotización: {e}")
-        db.session.rollback()  # Revierte los cambios si hay un error
+        db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
 
@@ -1232,9 +1257,95 @@ def produccion():
     return render_template("produccion.html")
 
 
-@app.route("/la-pampa")
-def lapampa():
-    if 'user_id' not in session:
-        return redirect(url_for('main'))
-    return render_template("la-pampa.html")
+
+
+
+# --- Endpoint de la API para los datos de la tabla ---
+@app.route('/api/faena/la-pampa', methods=['GET'])
+def get_faena_data():
+    """Retorna datos de faena_pampa, resolviendo nombres de columna con espacios/acentos/mojibake."""
+    if not DB_CONFIG:
+        return jsonify({"error": "Configuración de base de datos no encontrada"}), 500
+
+    try:
+        # Fuerzo UTF-8 y obtengo columnas reales
+        conn = mysql.connector.connect(**DB_CONFIG, charset='utf8mb4', use_unicode=True)
+        cur = conn.cursor(dictionary=True)
+
+        # Columnas reales de la tabla
+        cur.execute("""
+            SELECT COLUMN_NAME 
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'faena_pampa'
+        """)
+        cols = [r['COLUMN_NAME'] for r in cur.fetchall()]
+        cols_lc = {c.lower(): c for c in cols}  # mapa lowercase -> real
+
+        # helper para elegir la mejor coincidencia por prefijo, tolerante a acentos/mojibake
+        def pick(*candidates):
+            """
+            Devuelve el nombre REAL de columna que mejor matchee cualquiera de los candidatos
+            (case-insensitive). Cada candidato puede ser prefijo o nombre completo.
+            """
+            cand_lc = [x.lower() for x in candidates]
+            # match exact
+            for c in cand_lc:
+                if c in cols_lc:
+                    return cols_lc[c]
+            # match por prefijo
+            for real in cols:
+                rl = real.lower()
+                for c in cand_lc:
+                    if rl.startswith(c):
+                        return real
+            raise KeyError(f"No se encontró ninguna de {candidates} en columnas: {cols}")
+
+        # Resolvemos los nombres que pueden variar
+        col_fecha        = pick("fecha faena", "fecha_faena", "fecha")
+        col_total        = pick("total animales", "total_animales")
+        col_halak        = pick("aptos halak", "aptos_halak")
+        col_kosher       = pick("aptos kosher", "aptos_kosher")
+        col_rechazos     = pick("rechazos")
+        col_cajon        = pick("rechazo por cajon", "rechazo por cajón", "rechazo por caj")  # <- mojibake cae acá
+        col_livianos     = pick("rechazo por livianos", "rechazo_por_livianos")
+        col_pulmon_roto  = pick("rechazo por pulmon roto", "rechazo_por_pulmon_roto")
+        col_pulmon       = pick("rechazo por pulmon", "rechazo_por_pulmon")
+
+        # Construimos la query con los nombres REALES envueltos en backticks
+        query = f"""
+            SELECT
+                `{col_fecha}`       AS "Fecha Faena",
+                `{col_total}`       AS "Total Animales",
+                `{col_halak}`       AS "Aptos Halak",
+                `{col_kosher}`      AS "Aptos Kosher",
+                `{col_rechazos}`    AS "Rechazos",
+                `{col_cajon}`       AS "Rechazo por cajon",
+                `{col_livianos}`    AS "Rechazo por Livianos",
+                `{col_pulmon_roto}` AS "Rechazo por Pulmon roto",
+                `{col_pulmon}`      AS "Rechazo por Pulmon"
+            FROM `faena_pampa`
+        """
+
+        cur.execute(query)
+        data = cur.fetchall()
+        cur.close(); conn.close()
+        return jsonify(data)
+
+    except KeyError as e:
+        # Alguna columna no se encontró: devolvemos el detalle
+        return jsonify({"error": f"Columna faltante: {str(e)}"}), 500
+    except mysql.connector.Error as err:
+        print(f"Error de base de datos: {err}")
+        return jsonify({"error": "No se pudieron obtener los datos de la faena"}), 500
+
+# --- Ruta para servir el archivo HTML ---
+@app.route('/faena-lapampa')
+def faena_la_pampa():
+    return render_template('faena-lapampa.html')
+
+
+
+
+
+
 
