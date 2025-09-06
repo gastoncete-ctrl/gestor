@@ -23,6 +23,8 @@ import calendar
 from urllib.parse import urlparse
 from flask import Flask, jsonify, render_template
 from sqlalchemy import update, and_, or_ # Asegúrate de que `update` esté importado
+from datetime import date
+from math import ceil
 
 
 
@@ -1260,83 +1262,403 @@ def produccion():
 
 
 
-# --- Endpoint de la API para los datos de la tabla ---
-@app.route('/api/faena/la-pampa', methods=['GET'])
-def get_faena_data():
-    """Retorna datos de faena_pampa, resolviendo nombres de columna con espacios/acentos/mojibake."""
-    if not DB_CONFIG:
-        return jsonify({"error": "Configuración de base de datos no encontrada"}), 500
 
+
+
+
+
+
+
+_COLS_LC = None
+_COLS_LIST = None
+
+def _load_cols():
+    global _COLS_LC, _COLS_LIST
+    if _COLS_LC is not None:
+        return _COLS_LC, _COLS_LIST
+    conn = mysql.connector.connect(**DB_CONFIG, charset='utf8mb4', use_unicode=True)
+    cur = conn.cursor(dictionary=True)
+    cur.execute(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS "
+        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'faena_pampa'"
+    )
+    _COLS_LIST = [r['COLUMN_NAME'] for r in cur.fetchall()]
+    _COLS_LC = {c.lower(): c for c in _COLS_LIST}
+    cur.close(); conn.close()
+    return _COLS_LC, _COLS_LIST
+
+def _pick(cols_lc, cols_list, *candidates):
+    cand_lc = [x.lower() for x in candidates]
+    for c in cand_lc:
+        if c in cols_lc:
+            return cols_lc[c]
+    for real in cols_list:
+        rl = real.lower()
+        for c in cand_lc:
+            if rl.startswith(c):
+                return real
+    raise KeyError(f"No se encontró ninguna de {candidates}")
+
+def _dt_ensure_date(d):
     try:
-        # Fuerzo UTF-8 y obtengo columnas reales
-        conn = mysql.connector.connect(**DB_CONFIG, charset='utf8mb4', use_unicode=True)
-        cur = conn.cursor(dictionary=True)
+        return d.date() if hasattr(d, "date") else d
+    except Exception:
+        return d
 
-        # Columnas reales de la tabla
-        cur.execute("""
-            SELECT COLUMN_NAME 
-            FROM INFORMATION_SCHEMA.COLUMNS
-            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'faena_pampa'
-        """)
-        cols = [r['COLUMN_NAME'] for r in cur.fetchall()]
-        cols_lc = {c.lower(): c for c in cols}  # mapa lowercase -> real
+def _season_bounds_by_id(cur, season_id: int):
+    cur.execute(
+        "SELECT fecha_inicio, fecha_final FROM temporada_pampa "
+        "WHERE id_temporada_pampa = %s LIMIT 1",
+        [season_id]
+    )
+    r = cur.fetchone()
+    if not r:
+        return None, None
+    start = _dt_ensure_date(r["fecha_inicio"])
+    fin   = _dt_ensure_date(r["fecha_final"])
+    end = fin + timedelta(days=1)  # [inicio, fin+1)
+    return start, end
 
-        # helper para elegir la mejor coincidencia por prefijo, tolerante a acentos/mojibake
-        def pick(*candidates):
-            """
-            Devuelve el nombre REAL de columna que mejor matchee cualquiera de los candidatos
-            (case-insensitive). Cada candidato puede ser prefijo o nombre completo.
-            """
-            cand_lc = [x.lower() for x in candidates]
-            # match exact
-            for c in cand_lc:
-                if c in cols_lc:
-                    return cols_lc[c]
-            # match por prefijo
-            for real in cols:
-                rl = real.lower()
-                for c in cand_lc:
-                    if rl.startswith(c):
-                        return real
-            raise KeyError(f"No se encontró ninguna de {candidates} en columnas: {cols}")
+def _current_or_latest_season(cur):
+    cur.execute(
+        "SELECT id_temporada_pampa AS id, fecha_inicio, fecha_final "
+        "FROM temporada_pampa ORDER BY fecha_inicio ASC"
+    )
+    temporadas = cur.fetchall()
+    if not temporadas:
+        return None, None, None
+    today = date.today()
+    chosen = None
+    for t in temporadas:
+        ini = _dt_ensure_date(t["fecha_inicio"])
+        fin = _dt_ensure_date(t["fecha_final"])
+        if ini <= today <= fin:
+            chosen = t
+            break
+        if _dt_ensure_date(t["fecha_inicio"]) <= today:
+            chosen = t
+    if not chosen:
+        chosen = temporadas[-1]
+    return chosen["id"], _dt_ensure_date(chosen["fecha_inicio"]), _dt_ensure_date(chosen["fecha_final"])
 
-        # Resolvemos los nombres que pueden variar
-        col_fecha        = pick("fecha faena", "fecha_faena", "fecha")
-        col_total        = pick("total animales", "total_animales")
-        col_halak        = pick("aptos halak", "aptos_halak")
-        col_kosher       = pick("aptos kosher", "aptos_kosher")
-        col_rechazos     = pick("rechazos")
-        col_cajon        = pick("rechazo por cajon", "rechazo por cajón", "rechazo por caj")  # <- mojibake cae acá
-        col_livianos     = pick("rechazo por livianos", "rechazo_por_livianos")
-        col_pulmon_roto  = pick("rechazo por pulmon roto", "rechazo_por_pulmon_roto")
-        col_pulmon       = pick("rechazo por pulmon", "rechazo_por_pulmon")
 
-        # Construimos la query con los nombres REALES envueltos en backticks
-        query = f"""
-            SELECT
-                `{col_fecha}`       AS "Fecha Faena",
-                `{col_total}`       AS "Total Animales",
-                `{col_halak}`       AS "Aptos Halak",
-                `{col_kosher}`      AS "Aptos Kosher",
-                `{col_rechazos}`    AS "Rechazos",
-                `{col_cajon}`       AS "Rechazo por cajon",
-                `{col_livianos}`    AS "Rechazo por Livianos",
-                `{col_pulmon_roto}` AS "Rechazo por Pulmon roto",
-                `{col_pulmon}`      AS "Rechazo por Pulmon"
-            FROM `faena_pampa`
+def _month_bounds(y: int, m: int):
+    """[start, end) del mes."""
+    if m == 12:
+        return date(y, 12, 1), date(y + 1, 1, 1)
+    return date(y, m, 1), date(y, m + 1, 1)
+
+def _query_month(cur, base_query: str, col_fecha: str, y: int, m: int):
+    """Ejecuta la query filtrando por mes y devuelve filas."""
+    start, end = _month_bounds(y, m)
+    q = base_query + f" WHERE `{col_fecha}` >= %s AND `{col_fecha}` < %s ORDER BY `{col_fecha}` ASC"
+    cur.execute(q, [start, end])
+    return cur.fetchall()
+
+
+def _dt_ensure_date(d):
+    # Convierte datetime a date si viniera con hora
+    try:
+        return d.date() if hasattr(d, "date") else d
+    except Exception:
+        return d
+
+def _season_bounds_by_id(cur, season_id: int):
+    cur.execute("""
+        SELECT fecha_inicio, fecha_final
+        FROM temporada_pampa
+        WHERE id_temporada_pampa = %s
+        LIMIT 1
+    """, [season_id])
+    r = cur.fetchone()
+    if not r:
+        return None, None
+    start = _dt_ensure_date(r["fecha_inicio"])
+    fin   = _dt_ensure_date(r["fecha_final"])
+    # Usamos rango semiabierto [inicio, fin+1día)
+    end = fin + timedelta(days=1)
+    return start, end
+
+def _current_or_latest_season(cur):
+    # Devuelve (id, inicio, fin) de la temporada que incluye hoy;
+    # si hoy no cae en ninguna, devuelve la última por fecha_inicio <= hoy
+    cur.execute("""
+        SELECT id_temporada_pampa AS id, fecha_inicio, fecha_final
+        FROM temporada_pampa
+        ORDER BY fecha_inicio ASC
+    """)
+    temporadas = cur.fetchall()
+    if not temporadas:
+        return None, None, None
+    today = date.today()
+    chosen = None
+    for t in temporadas:
+        ini = _dt_ensure_date(t["fecha_inicio"])
+        fin = _dt_ensure_date(t["fecha_final"])
+        if ini <= today <= fin:
+            chosen = t; break
+        if _dt_ensure_date(t["fecha_inicio"]) <= today:
+            chosen = t  # se quedará con la última <= hoy
+    if not chosen:
+        chosen = temporadas[-1]  # fallback: la última
+    return chosen["id"], _dt_ensure_date(chosen["fecha_inicio"]), _dt_ensure_date(chosen["fecha_final"])
+
+def _pick_column(cur, table_name, *candidates):
+    # Devuelve el nombre REAL de columna en `table_name` que mejor matchee
+    # cualquiera de los candidatos (case-insensitive o por prefijo).
+    cur.execute(
         """
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s
+        """, (table_name,)
+    )
+    cols = [r['COLUMN_NAME'] for r in cur.fetchall()]
+    cols_lc = {c.lower(): c for c in cols}
 
-        cur.execute(query)
-        data = cur.fetchall()
+    cand_lc = [x.lower() for x in candidates]
+    # match exacto
+    for c in cand_lc:
+        if c in cols_lc:
+            return cols_lc[c]
+    # match por prefijo
+    for real in cols:
+        rl = real.lower()
+        for c in cand_lc:
+            if rl.startswith(c):
+                return real
+    raise KeyError(f"No se encontró ninguna de {candidates} en {cols}")
+
+def _pick_column(cur, table_name, *candidates):
+    'Resuelve nombre real de columna tolerante a acentos/prefijos.'
+    cur.execute(
+        "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS "
+        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s",
+        (table_name,)
+    )
+    cols = [r['COLUMN_NAME'] for r in cur.fetchall()]
+    cols_lc = {c.lower(): c for c in cols}
+    cand_lc = [x.lower() for x in candidates]
+    for c in cand_lc:
+        if c in cols_lc:
+            return cols_lc[c]
+    for real in cols:
+        rl = real.lower()
+        for c in cand_lc:
+            if rl.startswith(c):
+                return real
+    raise KeyError(f"No se encontró ninguna de {candidates} en {cols}")
+
+def _month_bounds(y: int, m: int):
+    if m == 12:
+        return date(y, 12, 1), date(y + 1, 1, 1)
+    return date(y, m, 1), date(y, m + 1, 1)
+
+# ---------- temporadas (solo desde faena_pampa) ----------
+@app.route('/api/faena/la-pampa/temporadas', methods=['GET'])
+def get_temporadas_from_faena():
+    'Devuelve temporadas agrupadas por id_temporada_pampa con rango de fechas.'
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG, charset='utf8mb4', use_unicode=True)
+        cur  = conn.cursor(dictionary=True)
+        tbl = 'faena_pampa'
+
+        col_fecha     = _pick_column(cur, tbl, 'fecha faena', 'fecha_faena', 'fecha')
+        col_temporada = _pick_column(cur, tbl, 'id_temporada_pampa', 'id temporada', 'temporada_pampa')
+
+        sql = (
+            f"SELECT `{col_temporada}` AS id, "
+            f"MIN(`{col_fecha}`) AS start_date, "
+            f"MAX(`{col_fecha}`) AS end_date, "
+            f"MAX(`{col_fecha}`) AS last_date "
+            f"FROM `{tbl}` "
+            f"GROUP BY `{col_temporada}` "
+            f"HAVING id IS NOT NULL "
+            f"ORDER BY id ASC"
+        )
+        cur.execute(sql)
+        rows = cur.fetchall()
+
+        current_id = None
+        if rows:
+            latest = max(rows, key=lambda r: r['last_date'])
+            current_id = latest['id']
+
+        temporadas = []
+        for r in rows:
+            cur.execute("SELECT DATE_FORMAT(%s,'%%d-%%m-%%Y') AS s", (r['start_date'],))
+            s = cur.fetchone()['s']
+            cur.execute("SELECT DATE_FORMAT(%s,'%%d-%%m-%%Y') AS e", (r['end_date'],))
+            e = cur.fetchone()['e']
+            temporadas.append({
+                "id": r['id'],
+                "start": s,
+                "end": e,
+                "label": f"Temporada {r['id']} ({s} a {e})"
+            })
+
         cur.close(); conn.close()
-        return jsonify(data)
-
-    except KeyError as e:
-        # Alguna columna no se encontró: devolvemos el detalle
-        return jsonify({"error": f"Columna faltante: {str(e)}"}), 500
+        return jsonify({"current_id": current_id, "temporadas": temporadas})
     except mysql.connector.Error as err:
         print(f"Error de base de datos: {err}")
-        return jsonify({"error": "No se pudieron obtener los datos de la faena"}), 500
+        return jsonify({"error": "No se pudieron obtener las temporadas"}), 500
+    except Exception as e:
+        print(f"Error inesperado: {e}")
+        return jsonify({"error": "Error interno"}), 500
+
+# ---------- años disponibles para un mes ----------
+@app.route('/api/faena/la-pampa/years', methods=['GET'])
+def get_years_for_month():
+    month = request.args.get('month', type=int)
+    if not month or month < 1 or month > 12:
+        return jsonify({'error': 'month inválido'}), 400
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG, charset='utf8mb4', use_unicode=True)
+        cur  = conn.cursor(dictionary=True)
+
+        tbl = 'faena_pampa'
+        col_fecha = _pick_column(cur, tbl, 'fecha faena', 'fecha_faena', 'fecha')
+
+        cur.execute(
+            f"SELECT DISTINCT YEAR(`{col_fecha}`) AS y "
+            f"FROM `{tbl}` WHERE MONTH(`{col_fecha}`) = %s ORDER BY y DESC",
+            (month,)
+        )
+        years = [row['y'] for row in cur.fetchall()]
+        cur.close(); conn.close()
+
+        resp = jsonify({'month': month, 'years': years})
+        resp.headers['Cache-Control'] = 'public, max-age=300'
+        return resp
+    except mysql.connector.Error as err:
+        print(f'Error de base de datos: {err}')
+        return jsonify({'error': 'No se pudieron obtener los años'}), 500
+    except Exception as e:
+        print(f'Error inesperado: {e}')
+        return jsonify({'error': 'Error interno'}), 500
+
+# ---------- datos con paginación (default = último mes con datos) ----------
+@app.route('/api/faena/la-pampa', methods=['GET'])
+def get_faena_data():
+    season_id = request.args.get('season_id', type=int)
+    month     = request.args.get('month', type=int)
+    year      = request.args.get('year', type=int)
+    page      = max(1, request.args.get('page', default=1, type=int) or 1)
+    per_page  = min(500, max(1, request.args.get('per_page', default=10, type=int) or 10))
+    offset    = (page - 1) * per_page
+
+    order = (request.args.get('order', 'asc') or 'asc').lower()
+    order = 'DESC' if order == 'desc' else 'ASC'
+
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG, charset='utf8mb4', use_unicode=True)
+        cur  = conn.cursor(dictionary=True)
+
+        tbl = 'faena_pampa'
+        f   = 'f'  # alias
+
+        col_fecha        = _pick_column(cur, tbl, 'fecha faena', 'fecha_faena', 'fecha')
+        col_total        = _pick_column(cur, tbl, 'total animales', 'total_animales')
+        col_halak        = _pick_column(cur, tbl, 'aptos halak', 'aptos_halak')
+        col_kosher       = _pick_column(cur, tbl, 'aptos kosher', 'aptos_kosher')
+        col_rechazos     = _pick_column(cur, tbl, 'rechazos')
+        col_cajon        = _pick_column(cur, tbl, 'rechazo por cajon', 'rechazo por cajón', 'rechazo por caj')
+        col_livianos     = _pick_column(cur, tbl, 'rechazo por livianos', 'rechazo_por_livianos')
+        col_pulmon_roto  = _pick_column(cur, tbl, 'rechazo por pulmon roto', 'rechazo_por_pulmon_roto')
+        col_pulmon       = _pick_column(cur, tbl, 'rechazo por pulmon', 'rechazo_por_pulmon')
+        col_temporada    = _pick_column(cur, tbl, 'id_temporada_pampa', 'id temporada', 'temporada_pampa')
+
+        select_cols = [
+            f"DATE_FORMAT(`{f}`.`{col_fecha}`, '%Y-%m-%d') AS `FechaISO`",
+            f"DATE_FORMAT(`{f}`.`{col_fecha}`, '%d-%m-%Y') AS `Fecha Faena`",
+            f"`{f}`.`{col_total}`       AS `Total Animales`",
+            f"`{f}`.`{col_halak}`       AS `Aptos Halak`",
+            f"`{f}`.`{col_kosher}`      AS `Aptos Kosher`",
+            f"`{f}`.`{col_rechazos}`    AS `Rechazos`",
+            f"`{f}`.`{col_cajon}`       AS `Rechazo por cajon`",
+            f"`{f}`.`{col_livianos}`    AS `Rechazo por Livianos`",
+            f"`{f}`.`{col_pulmon_roto}` AS `Rechazo por Pulmon roto`",
+            f"`{f}`.`{col_pulmon}`      AS `Rechazo por Pulmon`",
+            f"`{f}`.`{col_temporada}`   AS `ID Temporada`",
+        ]
+        select_sql = 'SELECT ' + ', '.join(select_cols) + f" FROM `{tbl}` AS `{f}`"
+
+        where_parts, params = [], []
+
+        # 1) Filtro explícito por temporada
+        if season_id:
+            where_parts.append(f"`{f}`.`{col_temporada}` = %s")
+            params.append(season_id)
+
+        # 2) Si no hay temporada: por mes/año explícito
+        elif month and year:
+            start, end = _month_bounds(year, month)
+            where_parts.append(f"`{f}`.`{col_fecha}` >= %s AND `{f}`.`{col_fecha}` < %s")
+            params.extend([start, end])
+
+        # 3) Si no vino nada: DEFAULT = último mes con datos
+        else:
+            cur.execute(f"SELECT MAX(`{col_fecha}`) AS mx FROM `{tbl}`")
+            r = cur.fetchone()
+            if r and r['mx']:
+                mx = r['mx']
+                cur.execute("SELECT YEAR(%s) AS y, MONTH(%s) AS m", (mx, mx))
+                ym = cur.fetchone()
+                y  = ym['y']; m = ym['m']
+                start, end = _month_bounds(y, m)
+                where_parts.append(f"`{f}`.`{col_fecha}` >= %s AND `{f}`.`{col_fecha}` < %s")
+                params.extend([start, end])
+                applied_year, applied_month = y, m
+            else:
+                applied_year = applied_month = None
+
+        where_sql = (' WHERE ' + ' AND '.join(where_parts)) if where_parts else ''
+
+        cur.execute(f"SELECT COUNT(*) AS c FROM `{tbl}` AS `{f}`{where_sql}", params)
+        total = cur.fetchone()['c']
+
+        data_sql = select_sql + where_sql + f" ORDER BY `{f}`.`{col_fecha}` {order} LIMIT %s OFFSET %s"
+        cur.execute(data_sql, params + [per_page, offset])
+        items = cur.fetchall()
+
+        cur.close(); conn.close()
+
+        total_pages = ((total + per_page - 1) // per_page) if per_page else 1
+
+        resp = jsonify({
+            'items': items,
+            'page': page,
+            'per_page': per_page,
+            'total': total,
+            'total_pages': total_pages,
+            'order': order,
+        })
+        resp.headers['X-Total-Count'] = str(total)
+
+        if season_id:
+            resp.headers['X-Applied-Season'] = str(season_id)
+        elif month and year:
+            resp.headers['X-Applied-Year']  = str(year)
+            resp.headers['X-Applied-Month'] = str(month)
+        else:
+            if total > 0:
+                resp.headers['X-Applied-Year']  = str(applied_year)
+                resp.headers['X-Applied-Month'] = str(applied_month)
+
+        return resp
+
+    except mysql.connector.Error as err:
+        print(f'Error de base de datos: {err}')
+        return jsonify({'error': 'No se pudieron obtener los datos de la faena'}), 500
+    except Exception as e:
+        print(f'Error inesperado: {e}')
+        return jsonify({'error': 'Error interno'}), 500
+
+
+
+
+
+
 
 # --- Ruta para servir el archivo HTML ---
 @app.route('/faena-lapampa')

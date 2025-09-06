@@ -80,7 +80,7 @@
             margin-bottom: 20px;
         }
         .summary-card {
-            background-color: rgba(255, 255, 255, 0.2);
+            background-color: rgba(255, 255, 255, 0.83);
             border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: 15px;
             padding: 15px;
@@ -143,7 +143,79 @@
         
         .color-red { color: #e74c3c; font-weight: bold; }
         .color-green { color: #2ecc71; font-weight: bold; }
-    </style>
+
+        /* Contenedor */
+        .filters {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem;
+        margin: 1rem 0;
+        padding: 0.75rem 1rem;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+
+        /* Labels */
+        .filters label {
+        font-size: 0.9rem;
+        color: #333;
+        font-weight: 500;
+        }
+
+        /* Selects e input */
+        .filters select,
+        .filters input[type="number"] {
+        padding: 0.5rem 0.75rem;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        background-color: #fafafa;
+        font-size: 0.9rem;
+        transition: all 0.2s ease-in-out;
+        min-width: 130px;
+        }
+
+        .filters select:focus,
+        .filters input[type="number"]:focus {
+        outline: none;
+        border-color: #007bff;
+        box-shadow: 0 0 6px rgba(0, 123, 255, 0.3);
+        background-color: #fff;
+        }
+
+        /* Botones */
+        .filters button {
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        border: none;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        }
+
+        /* Botón primario */
+        .filters button.primary {
+        background: linear-gradient(135deg, #007bff, #0056b3);
+        color: white;
+        font-weight: 500;
+        }
+
+        .filters button.primary:hover {
+        background: linear-gradient(135deg, #0056b3, #004494);
+        }
+
+        /* Botón secundario */
+        .filters button.secondary {
+        background: #f1f1f1;
+        color: #333;
+        font-weight: 500;
+        }
+
+        .filters button.secondary:hover {
+        background: #e2e2e2;
+        }
+        </style>
 </head>
 <body>
     <header class="header">
@@ -184,6 +256,21 @@
                 <p>טרף</p>
             </div>
         </div>
+        <div class="filters">
+            <label for="filter-season">Temporada</label>
+            <select id="filter-season"></select>
+
+            <label for="filter-month">Mes</label>
+            <select id="filter-month"></select>
+
+            <label for="filter-year">Año</label>
+            <input id="filter-year" type="number" min="1900" max="2100" step="1" />
+
+            <button class="primary" id="apply-filter">Aplicar</button>
+            <button class="secondary" id="clear-filter">Ir al último mes faenado</button>
+        </div>
+        <div id="loading-overlay" aria-hidden="true"><div class="spinner" aria-label="Cargando"></div></div>
+
 
         <div class="main-table-container">
             <table>
@@ -223,196 +310,11 @@
             </table>
         </div>
     </div>
-    <div class="filter-bar" style="display:flex; gap:12px; align-items:center; margin: 12px 0 16px;">
-        <label>Mes:
-            <select id="filter-month">
-            <option value="1">Enero</option><option value="2">Febrero</option>
-            <option value="3">Marzo</option><option value="4">Abril</option>
-            <option value="5">Mayo</option><option value="6">Junio</option>
-            <option value="7">Julio</option><option value="8">Agosto</option>
-            <option value="9">Septiembre</option><option value="10">Octubre</option>
-            <option value="11">Noviembre</option><option value="12">Diciembre</option>
-            </select>
-        </label>
-        <label>Año:
-            <input id="filter-year" type="number" min="2000" max="2100" style="width: 110px;">
-        </label>
-        <button id="apply-filter" style="padding:8px 12px; border:1px solid #ddd; border-radius:6px; background:#f7f7f7; cursor:pointer;">
-            Aplicar
-        </button>
-        <button id="clear-filter" style="padding:8px 12px; border:1px solid #ddd; border-radius:6px; background:#fff; cursor:pointer;">
-            Ver todo
-        </button>
-    </div>
-    <script>
-        const tableBody = document.getElementById('faena-table-body');
-        // Reemplaza tu función formatFecha por esta:
-        const formatFecha = (value) => {
-        if (!value) return ''; // null/undefined/''
 
-        // Caso 1: string tipo 'YYYY-MM-DD' o 'YYYY-MM-DD HH:MM:SS' o 'YYYY-MM-DDTHH:MM:SS'
-        if (typeof value === 'string') {
-            const t = value.trim();
-
-            // Match directo 'YYYY-MM-DD' al inicio (ignora lo que sigue)
-            const m = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
-            if (m) {
-            const [, yyyy, mm, dd] = m;
-            return `${dd}-${mm}_${yyyy}`;
-            }
-
-            // Intento genérico con Date (reemplazo espacio por 'T' para ISO-like)
-            const dt = new Date(t.replace(' ', 'T'));
-            if (!isNaN(dt)) {
-            const yyyy = String(dt.getFullYear());
-            const mm = String(dt.getMonth() + 1).padStart(2, '0');
-            const dd = String(dt.getDate()).padStart(2, '0');
-            return `${dd}-${mm}_${yyyy}`;
-            }
-
-            // Fallback: devuelve tal cual si no pudimos parsear
-            return t;
-        }
-
-        // Caso 2: ya viene como objeto Date
-        if (value instanceof Date && !isNaN(value)) {
-            const yyyy = String(value.getFullYear());
-            const mm = String(value.getMonth() + 1).padStart(2, '0');
-            const dd = String(value.getDate()).padStart(2, '0');
-            return `${dd}-${mm}_${yyyy}`;
-        }
-
-        // Último recurso
-        return String(value);
-        };
-        const renderizarTabla = (data) => {
-            tableBody.innerHTML = ''; // Limpia el cuerpo de la tabla
-            data.forEach(item => {
-                const totalCabezas = Number(item["Total Animales"]) || 0;
-                const aptosHalak   = Number(item["Aptos Halak"]) || 0;
-                const aptosKosher  = Number(item["Aptos Kosher"]) || 0;
-                const rechazos     = Number(item["Rechazos"]) || 0;
-
-                const totalRegistradas = aptosHalak + aptosKosher + rechazos;
-
-                const pct = (num, den) => den > 0 ? ((num / den) * 100).toFixed(2) : '0.00';
-
-                const halakPorcentaje = pct(aptosHalak, totalCabezas);
-                const kosherPorcentaje = pct(aptosKosher, totalCabezas);
-                const rechazoPorcentaje = pct(rechazos, totalCabezas);
-                const totalRegistradasPorcentaje = pct(totalRegistradas, totalCabezas);
-
-                const rechazoCajon  = Number(item["Rechazo por cajon"]) || 0;
-                const rechazoLiv    = Number(item["Rechazo por Livianos"]) || 0;
-                const rechazoPRoto  = Number(item["Rechazo por Pulmon roto"]) || 0;
-                const rechazoPul    = Number(item["Rechazo por Pulmon"]) || 0;
-
-                const rechazoCajonPorcentaje = pct(rechazoCajon, totalCabezas);
-                const rechazoLivianosPorcentaje = pct(rechazoLiv, totalCabezas);
-                const rechazoPulmonRotoPorcentaje = pct(rechazoPRoto, totalCabezas);
-                const rechazoPulmonPorcentaje = pct(rechazoPul, totalCabezas);
-
-                
-                
-                const monthSelect = document.getElementById('filter-month');
-                const yearInput   = document.getElementById('filter-year');
-                const applyBtn    = document.getElementById('apply-filter');
-                const clearBtn    = document.getElementById('clear-filter');
-
-                // Formatear la fecha a DD-MM-AAAA
-                const fechaOriginal = new Date(item['Fecha Faena']);
-                const dia = String(fechaOriginal.getDate()).padStart(2, '0');
-                const mes = String(fechaOriginal.getMonth() + 1).padStart(2, '0');
-                const anio = fechaOriginal.getFullYear();
-                const fechaFormateada = `${dia}-${mes}-${anio}`;                
-
-                const cargarDatos = async (month = null, year = null) => {
-                try {
-                    let url = '/api/faena/la-pampa';
-                    const params = [];
-                    if (month && year) {
-                    params.push(`month=${encodeURIComponent(month)}`);
-                    params.push(`year=${encodeURIComponent(year)}`);
-                    }
-                    if (params.length) url += `?${params.join('&')}`;
-
-                    const response = await fetch(url);
-                    if (!response.ok) throw new Error(`Error en la solicitud: ${response.status}`);
-                    const data = await response.json();
-                    renderizarTabla(data);
-                } catch (error) {
-                    console.error("Error al cargar los datos:", error);
-                    alert("Ocurrió un error al cargar los datos de faena.");
-                }
-                };
-
-                document.addEventListener('DOMContentLoaded', () => {
-                // Mes/año del navegador del usuario
-                const now = new Date();
-                const m = now.getMonth() + 1; // 1-12
-                const y = now.getFullYear();
-
-                monthSelect.value = String(m);
-                yearInput.value = String(y);
-
-                // Por defecto: cargar mes actual del usuario
-                cargarDatos(m, y);
-                });
-
-                applyBtn.addEventListener('click', () => {
-                const m = parseInt(monthSelect.value, 10);
-                const y = parseInt(yearInput.value, 10);
-                if (!m || !y) return;
-                cargarDatos(m, y);
-                });
-
-                clearBtn.addEventListener('click', () => {
-                // Ver todo (sin filtro → sin querystring)
-                cargarDatos(null, null);
-                });
+    <script src="/static/frontend_faena_pagination_v6.js"></script>
 
 
-                const row = document.createElement('tr');
-                    row.innerHTML = `
-                    <td>${fechaFormateada}</td>
-                    <td>${totalCabezas}</td>
-                    <td>${item["Aptos Halak"]}</td>
-                    <td>${halakPorcentaje}%</td>
-                    <td>${item["Aptos Kosher"]}</td>
-                    <td>${kosherPorcentaje}%</td>
-                    <td>${item["Rechazos"]}</td>
-                    <td>${rechazoPorcentaje}%</td>
-                    <td>${totalRegistradas}</td>
-                    <td>${totalRegistradasPorcentaje}%</td>
-                    <td>${item["Rechazo por cajon"]}</td>
-                    <td>${rechazoCajonPorcentaje}%</td>
-                    <td>${item["Rechazo por Livianos"]}</td>
-                    <td>${rechazoLivianosPorcentaje}%</td>
-                    <td>${item["Rechazo por Pulmon roto"]}</td>
-                    <td>${rechazoPulmonRotoPorcentaje}%</td>
-                    <td>${item["Rechazo por Pulmon"]}</td>
-                    <td>${rechazoPulmonPorcentaje}%</td>
-                    `;
-                tableBody.appendChild(row);
-            });
-        };
 
-        const cargarDatos = async () => {
-            try {
-                const response = await fetch('/api/faena/la-pampa');
-                if (!response.ok) {
-                    throw new Error(`Error en la solicitud: ${response.status}`);
-                }
-                const data = await response.json();
-                renderizarTabla(data);
-            } catch (error) {
-                console.error("Error al cargar los datos:", error);
-                alert("Ocurrió un error al cargar los datos de faena.");
-            }
-        };
 
-        // Llama a la función para cargar los datos al cargar la página
-        document.addEventListener('DOMContentLoaded', cargarDatos);
-    </script>
 </body>
 </html>
