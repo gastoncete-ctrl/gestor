@@ -1,11 +1,12 @@
-
+// frontend_faena_pagination_v7_summary.js
 (function () {
   const tableBody    = document.getElementById('faena-table-body');
   const seasonSelect = document.getElementById('filter-season');
   const monthSelect  = document.getElementById('filter-month');
-  const yearSelect   = document.getElementById('filter-year'); // as <select>
+  const yearSelect   = document.getElementById('filter-year');
   const applyBtn     = document.getElementById('apply-filter');
   const clearBtn     = document.getElementById('clear-filter');
+  const downloadBtn = document.getElementById('download-csv');
 
   let currentPage  = 1;
   let perPage      = 10;
@@ -13,20 +14,10 @@
   let totalCount   = 0;
   let currentOrder = 'asc';
 
-  (function initPerPage() {
-    const saved = localStorage.getItem('faena_per_page');
-    if (saved) {
-      const n = parseInt(saved, 10);
-      if (!isNaN(n) && n > 0 && n <= 500) perPage = n;
-    } else {
-      const ans = prompt('¿Cuántas filas por página? (10/25/50/100)', '10');
-      const n = parseInt(ans || '10', 10);
-      perPage = (!isNaN(n) && n > 0 && n <= 500) ? n : 10;
-      localStorage.setItem('faena_per_page', String(perPage));
-    }
-  })();
+  const $ = (sel) => document.querySelector(sel);
+  const fmtInt = (n) => (Number(n)||0).toLocaleString('es-AR');
+  const fmtPct = (n) => (Number(n)||0).toLocaleString('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2}) + '%';
 
-  // UI base: spinner + paginador
   (function ensureUI(){
     const css = `
 #loading-overlay{position:fixed;inset:0;background:rgba(255,255,255,.55);backdrop-filter:saturate(120%) blur(2px);display:none;align-items:center;justify-content:center;z-index:9999}
@@ -63,7 +54,7 @@
     pill.innerHTML = `
       <button id="pg-first" title="Primera">«</button>
       <button id="pg-prev"  title="Anterior">‹</button>
-      <span class="num" id="pg-info">Página 1 de 1 (0)</span>
+      <span class="num" id="pg-info">Página 1 de 1 (0 filas)</span>
       <button id="pg-next"  title="Siguiente">›</button>
       <button id="pg-last"  title="Última">»</button>
       <span class="sep">|</span>
@@ -76,7 +67,10 @@
       </select>
     `;
     container.appendChild(pill);
+
     const sizeSel = pill.querySelector('#pg-size');
+    const saved = localStorage.getItem('faena_per_page');
+    if (saved) { const n = parseInt(saved, 10); if (!isNaN(n) && n>0 && n<=500) perPage = n; }
     sizeSel.value = String(perPage);
     sizeSel.addEventListener('change', () => {
       perPage = parseInt(sizeSel.value, 10) || 10;
@@ -93,8 +87,6 @@
   const showLoading = () => document.getElementById('loading-overlay')?.classList.add('show');
   const hideLoading = () => document.getElementById('loading-overlay')?.classList.remove('show');
 
-  const pct = (n, d) => d > 0 ? ((n / d) * 100).toFixed(2) : '0.00';
-  const clampMonth = (m) => Math.min(12, Math.max(1, Number(m)||0));
   const toDDMMYYYY = (s) => (String(s).match(/^(\\d{4})-(\\d{2})-(\\d{2})/) ? RegExp.$3+'-'+RegExp.$2+'-'+RegExp.$1 : String(s||''));
 
   function renderizarTabla(rows){
@@ -110,63 +102,89 @@
       const rpro = Number(item['Rechazo por Pulmon roto']) || 0;
       const rpul = Number(item['Rechazo por Pulmon']) || 0;
       const fecha = item['Fecha Faena'] || toDDMMYYYY(item['FechaISO']);
+      const pct = (n) => (n && total ? (n/total*100).toFixed(2) : '0.00');
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${fecha}</td>
         <td>${total}</td>
         <td>${halak}</td>
-        <td>${pct(halak, total)}%</td>
+        <td>${pct(halak)}%</td>
         <td>${kosher}</td>
-        <td>${pct(kosher, total)}%</td>
+        <td>${pct(kosher)}%</td>
         <td>${rech}</td>
-        <td>${pct(rech, total)}%</td>
+        <td>${pct(rech)}%</td>
         <td>${totReg}</td>
-        <td>${pct(totReg, total)}%</td>
+        <td>${pct(totReg)}%</td>
         <td>${rcaj}</td>
-        <td>${pct(rcaj, total)}%</td>
+        <td>${pct(rcaj)}%</td>
         <td>${rliv}</td>
-        <td>${pct(rliv, total)}%</td>
+        <td>${pct(rliv)}%</td>
         <td>${rpro}</td>
-        <td>${pct(rpro, total)}%</td>
+        <td>${pct(rpro)}%</td>
         <td>${rpul}</td>
-        <td>${pct(rpul, total)}%</td>
+        <td>${pct(rpul)}%</td>
       `;
       tableBody.appendChild(tr);
     });
   }
 
-  // --- Poblar temporadas ---
+  function updatePager() {
+    const info = document.getElementById('pg-info');
+    if (info) info.textContent = `Página ${currentPage} de ${totalPages} (${totalCount} filas)`;
+    ['pg-first','pg-prev'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = currentPage <= 1;
+    });
+    ['pg-next','pg-last'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = currentPage >= totalPages;
+    });
+  }
+
+  function updateSummaryCards(summary) {
+    const t = summary?.total   ?? 0;
+    const h = summary?.halak   ?? 0;
+    const k = summary?.kosher  ?? 0;
+    const r = summary?.rechazo ?? 0;
+    const pH = summary?.pct_halak   ?? (t ? (h/t*100) : 0);
+    const pK = summary?.pct_kosher  ?? (t ? (k/t*100) : 0);
+    const pR = summary?.pct_rechazo ?? (t ? (r/t*100) : 0);
+
+    const totalSpan   = document.getElementById('sum-total');
+    const halakSpan   = document.getElementById('sum-halak');
+    const kosherSpan  = document.getElementById('sum-kosher');
+    const rechazoSpan = document.getElementById('sum-rechazo');
+    if (totalSpan)   totalSpan.textContent   = `${fmtInt(t)} - 100%`;
+    if (halakSpan)   halakSpan.textContent   = `${fmtInt(h)} - ${fmtPct(pH)}`;
+    if (kosherSpan)  kosherSpan.textContent  = `${fmtInt(k)} - ${fmtPct(pK)}`;
+    if (rechazoSpan) rechazoSpan.textContent = `${fmtInt(r)} - ${fmtPct(pR)}`;
+  }
+
   async function cargarTemporadas(){
     if (!seasonSelect) return null;
-    showLoading();
     try{
       const r = await fetch('/api/faena/la-pampa/temporadas');
       if (!r.ok) throw new Error('No se pudieron cargar las temporadas');
       const { current_id, temporadas } = await r.json();
-      seasonSelect.innerHTML = '<option value="">-- Seleccionar temporada --</option>';
+      seasonSelect.innerHTML = '<option value=\"\">-- Seleccionar temporada --</option>';
       (temporadas || []).forEach(t => {
         const opt = document.createElement('option');
         opt.value = String(t.id);
         opt.textContent = t.label;
         seasonSelect.appendChild(opt);
       });
-      if (current_id) seasonSelect.value = String(current_id);
-      return current_id;
+      return current_id || null;
     } catch(e){
       console.error(e);
       return null;
-    } finally {
-      hideLoading();
     }
   }
 
-  // --- Poblar años válidos para un mes dado ---
   async function cargarAniosParaMes(month) {
     if (!yearSelect) return [];
     yearSelect.disabled = true;
-    yearSelect.innerHTML = '<option value="">-- Año --</option>';
+    yearSelect.innerHTML = '<option value=\"\">Año</option>';
     if (!month) return [];
-
     try{
       const r = await fetch(`/api/faena/la-pampa/years?month=${encodeURIComponent(month)}`);
       if (!r.ok) throw new Error('No se pudieron cargar los años');
@@ -206,6 +224,10 @@
     try{
       const resp = await fetch(url);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+      const appliedYear  = parseInt(resp.headers.get('X-Applied-Year')  || '', 10);
+      const appliedMonth = parseInt(resp.headers.get('X-Applied-Month') || '', 10);
+
       const payload = await resp.json();
       const rows = payload.items || [];
       totalPages  = payload.total_pages || 1;
@@ -213,6 +235,15 @@
       currentOrder = (payload.order || 'ASC').toString().toLowerCase();
       renderizarTabla(rows);
       updatePager();
+      updateSummaryCards(payload.summary);
+
+      if (!seasonId && !month && !year && !isNaN(appliedYear) && !isNaN(appliedMonth)) {
+        if (monthSelect) monthSelect.value = String(appliedMonth);
+        if (yearSelect) {
+          const ys = await cargarAniosParaMes(appliedMonth);
+          if (ys.length) yearSelect.value = String(appliedYear);
+        }
+      }
     }catch(e){
       console.error(e);
       alert('Ocurrió un error al cargar los datos de faena.');
@@ -221,48 +252,25 @@
     }
   }
 
-  function updatePager() {
-    const info = document.getElementById('pg-info');
-    if (info) info.textContent = `Página ${currentPage} de ${totalPages} (${totalCount} filas)`;
-    ['pg-first','pg-prev'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.disabled = currentPage <= 1;
-    });
-    ['pg-next','pg-last'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.disabled = currentPage >= totalPages;
-    });
-  }
-
   function triggerLoad() {
     const {sid, m, y} = currentFilter();
     cargarDatos({ seasonId: sid || undefined, month: m || undefined, year: y || undefined, page: currentPage, order: currentOrder });
   }
 
-  // Listeners
   if (seasonSelect) seasonSelect.addEventListener('change', () => {
-    // si el usuario elige temporada, desactivamos mes/año
     if (monthSelect) monthSelect.value = '';
-    if (yearSelect) { yearSelect.innerHTML = '<option value=\"\">-- Año --</option>'; yearSelect.disabled = true; }
-    currentPage = 1; currentOrder = 'asc';
-    triggerLoad();
+    if (yearSelect) { yearSelect.innerHTML = '<option value=\"\">Año</option>'; yearSelect.disabled = true; }
+    currentPage = 1; currentOrder = 'asc'; triggerLoad();
   });
 
   if (monthSelect) monthSelect.addEventListener('change', async () => {
-    // limpiar temporada
     if (seasonSelect) seasonSelect.value = '';
     const m = parseInt(monthSelect.value || '0', 10);
-    if (!m) { if (yearSelect){ yearSelect.innerHTML = '<option value=\"\">-- Año --</option>'; yearSelect.disabled = true; } return; }
-
-    // cargar años disponibles para ese mes
+    if (!m) { if (yearSelect){ yearSelect.innerHTML = '<option value=\"\">Año</option>'; yearSelect.disabled = true; } return; }
     const years = await cargarAniosParaMes(m);
-    // si había un año seleccionado que ya no existe, lo limpiamos; si no hay, no cargamos
     if (!years.length) return;
-    // elige por defecto el más reciente (lista viene desc)
     if (yearSelect && !yearSelect.value) yearSelect.value = String(years[0]);
-
-    currentPage = 1; currentOrder = 'asc';
-    triggerLoad();
+    currentPage = 1; currentOrder = 'asc'; triggerLoad();
   });
 
   if (yearSelect) yearSelect.addEventListener('change', () => {
@@ -276,24 +284,50 @@
   if (clearBtn) clearBtn.addEventListener('click', () => {
     if (seasonSelect) seasonSelect.value = '';
     if (monthSelect)  monthSelect.value  = '';
-    if (yearSelect)  { yearSelect.innerHTML = '<option value=\"\">-- Año --</option>'; yearSelect.disabled = true; }
+    if (yearSelect)  { yearSelect.innerHTML = '<option value=\"\">Año</option>'; yearSelect.disabled = true; }
     currentPage = 1; currentOrder = 'asc'; triggerLoad();
   });
 
-  // Inicialización
   document.addEventListener('DOMContentLoaded', async () => {
-    const currentSeasonId = await cargarTemporadas();
-    // Si no hay temporada actual, prellenar mes actual y cargar años
-    if (!currentSeasonId) {
-      const now = new Date();
-      if (monthSelect) monthSelect.value = String(now.getMonth() + 1);
-      const years = await cargarAniosParaMes(now.getMonth() + 1);
-      if (years.length && yearSelect) {
-        const prefer = years.includes(now.getFullYear()) ? now.getFullYear() : years[0];
-        yearSelect.value = String(prefer);
+    if (monthSelect && (!monthSelect.options || monthSelect.options.length <= 1)) {
+      const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      if (!monthSelect.options.length) {
+        const ph = document.createElement('option'); ph.value=''; ph.textContent='Mes'; monthSelect.appendChild(ph);
+      }
+      if (monthSelect.options.length <= 1) {
+        months.forEach((name, idx) => {
+          const opt = document.createElement('option');
+          opt.value = String(idx + 1);
+          opt.textContent = name;
+          monthSelect.appendChild(opt);
+        });
       }
     }
+
+    await cargarTemporadas();
     currentPage = 1; currentOrder = 'asc';
-    triggerLoad();
+    await cargarDatos({});
   });
+
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', () => {
+      const sid = seasonSelect ? parseInt(seasonSelect.value || '0', 10) || null : null;
+      const m   = monthSelect  ? parseInt(monthSelect.value  || '0', 10) || null : null;
+      const y   = yearSelect   ? parseInt(yearSelect.value   || '0', 10) || null : null;
+
+      const params = new URLSearchParams();
+      if (sid) {
+        params.set('season_id', sid);
+      } else if (m && y) {
+        params.set('month', m);
+        params.set('year',  y);
+      }
+      params.set('order', (currentOrder || 'asc'));
+
+      const url = `/api/faena/la-pampa/export?${params.toString()}`;
+      // Disparamos descarga
+      window.location.href = url;
+    });
+  }
+
 })();

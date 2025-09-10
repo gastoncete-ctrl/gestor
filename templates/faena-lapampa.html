@@ -238,24 +238,25 @@
     <div class="content-container">
         <h1 class="main-title">Faena - La Anonima - Pampa Natural</h1>
         
-        <div class="summary-cards-container">
-            <div class="summary-card">
-                <span>68832 - 100%</span>
-                <p>Total</p>
-            </div>
-            <div class="summary-card">
-                <span>29014 - 42,15%</span>
-                <p>הלק</p>
-            </div>
-            <div class="summary-card">
-                <span>18505 - 26,88%</span>
-                <p>בשר</p>
-            </div>
-            <div class="summary-card">
-                <span>21313 - 30,96%</span>
-                <p>טרף</p>
-            </div>
+    <div class="summary-cards-container">
+        <div class="summary-card">
+            <span id="sum-total">0 - 100%</span>
+            <p>Total</p>
         </div>
+        <div class="summary-card">
+            <span id="sum-halak">0 - 0%</span>
+            <p>הלק</p>
+        </div>
+        <div class="summary-card">
+            <span id="sum-kosher">0 - 0%</span>
+            <p>בשר</p>
+        </div>
+        <div class="summary-card">
+            <span id="sum-rechazo">0 - 0%</span>
+            <p>טרף</p>
+        </div>
+    </div>
+
         <div class="filters">
             <label for="filter-season">Temporada</label>
             <select id="filter-season"></select>
@@ -266,8 +267,11 @@
             <label for="filter-year">Año</label>
             <input id="filter-year" type="number" min="1900" max="2100" step="1" />
 
-            <button class="primary" id="apply-filter">Aplicar</button>
+            <button class="secondary" id="apply-filter">Aplicar</button>
             <button class="secondary" id="clear-filter">Ir al último mes faenado</button>
+
+            <button id="download-csv" class="primary">Descargar</button>
+
         </div>
         <div id="loading-overlay" aria-hidden="true"><div class="spinner" aria-label="Cargando"></div></div>
 
@@ -311,7 +315,8 @@
         </div>
     </div>
 
-    <script src="/static/frontend_faena_pagination_v6.js"></script>
+    <script src="/static/frontend_faena_pagination_v7_summary.js"></script>
+
 
 
 
