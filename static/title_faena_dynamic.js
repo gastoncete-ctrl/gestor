@@ -1,12 +1,20 @@
 // Title only — safe addon. No toca tu lógica de carga de tabla
-// Usa el TEXTO visible del <option> (no el value) y agrega la temporada si existe
-// Asegura que tras "Aplicar" o "Limpiar" se vuelva a escribir el título con nombres.
+// Usa el TEXTO visible del <option> (no el value) y agrega la temporada con formato:
+//   " - Temporada [dd-mm-aaaa a dd-mm-aaaa]" (sin paréntesis dobles)
+// Además centra el título sin depender del CSS externo.
 
 (function () {
   function $(sel) { return document.querySelector(sel); }
 
   const titleEl = document.getElementById('title-faena');
   if (!titleEl) return; // si no existe, no hacemos nada
+
+  // Forzamos centrado por estilo inline para evitar colisiones de CSS
+  try {
+    titleEl.style.textAlign = 'center';
+    titleEl.style.display   = 'block';
+    titleEl.style.width     = '100%';
+  } catch (e) {}
 
   // IDs que ya usás en tu HTML
   const selFrig    = $('#selFrigorifico');
@@ -24,6 +32,20 @@
     return (opt && opt.textContent ? opt.textContent.trim() : '');
   };
 
+  // Construye el sufijo de temporada con el formato deseado
+  function buildSeasonSuffix() {
+    if (!(selTemp && selTemp.value)) return '';
+    const tText = getText(selTemp); // p.ej.: "Temporada (05-05-2025 a 16-09-2025)"
+    if (!tText) return '';
+
+    // Extrae primer contenido dentro de paréntesis si existe
+    const m = tText.match(/\(([^()]+)\)/);
+    const range = (m && m[1]) ? m[1].trim() : tText.replace(/^[Tt]emporada\s*/,'').trim();
+    if (!range) return '';
+
+    return ` - Temporada [${range}]`;
+  }
+
   function refreshTitle() {
     const fVal = (selFrig && selFrig.value || '').trim();
     const cVal = (selCliente && selCliente.value || '').trim();
@@ -33,15 +55,11 @@
       return;
     }
 
-    let text = `Faena - ${getText(selFrig)} - ${getText(selCliente)}`;
+    const fText = getText(selFrig);
+    const cText = getText(selCliente);
+    const seasonSuffix = buildSeasonSuffix();
 
-    // Si hay temporada seleccionada, la agregamos entre paréntesis
-    if (selTemp && selTemp.value) {
-      const tText = getText(selTemp);
-      if (tText) text += ` (${tText})`;
-    }
-
-    titleEl.textContent = text;
+    titleEl.textContent = `Faena - ${fText} - ${cText}${seasonSuffix}`;
   }
 
   // Reaccionar a cambios de selects (no interfiere con tu JS existente)
