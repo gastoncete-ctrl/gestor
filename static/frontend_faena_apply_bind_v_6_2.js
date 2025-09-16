@@ -180,14 +180,69 @@
     catch(e){ console.error('[faena] error', e); if(tbody) tbody.innerHTML = `<tr><td colspan="24" style="text-align:center">No se pudieron cargar los datos.</td></tr>`; updateSummary([]); }
     finally { showOverlay(false); setBtnLoading(false); }
   };
+  //Csv nuevo
+  function buildCsv(rows) {
+    const header = [
+      'Fecha de Faena','Total de Cabezas',
+      'Halak (Total)','Halak (%)',
+      'Kosher (Total)','Kosher (%)',
+      'Rechazo (Total)','Rechazo (%)',
+      'Total Registradas','% Total',
+      'Rechazo por cajón (Cant.)','Rechazo por cajón (%)',
+      'Rechazo por livianos (Cant.)','Rechazo por livianos (%)',
+      'Rechazo por pulmón roto (Cant.)','Rechazo por pulmón roto (%)',
+      'Rechazo por pulmón (Cant.)','Rechazo por pulmón (%)'
+    ];
 
-  // CSV según tabla
-  const onDownloadCsv = async()=>{
-    const url = `/api/faena/la-pampa?${qs(buildParams())}`; showOverlay(true);
-    try { const data = await fetchJSON(url); const rows = Array.isArray(data?.rows)? data.rows : []; const mode = selTabla?.value||'t1'; const lines = []; if(mode==='t2'){ lines.push(['#','Slaughter Date','Heads','2-4 Teeth (qty)','2-4 Teeth (%)','6 Teeth (qty)','6 Teeth (%)','8 Teeth (qty)','8 Teeth (%)','Rejected Knocking box (qty)','Rejected Knocking box (%)','Rejected Stomach (qty)','Rejected Stomach (%)','Rejected Lung (qty)','Rejected Lung (%)','Rejected Total (qty)','Rejected Total (%)','Beit Yosef (qty)','Beit Yosef (%)','Halak (qty)','Halak (%)']); rows.forEach((r,i)=>{ const c = normalize(r); lines.push([ i+1,c.fecha||'',c.total,c.d24,c.d24_pct.toFixed(2),c.d6,c.d6_pct.toFixed(2),c.d8,c.d8_pct.toFixed(2),c.rcajon,c.rcajon_pct.toFixed(2),c.rpanza,c.rpanza_pct.toFixed(2),c.rlung,c.rlung_pct.toFixed(2),c.rechazo,c.rechazo_pct.toFixed(2),c.beit,c.beit_pct.toFixed(2),c.halak,c.halak_pct.toFixed(2) ]); }); } else { lines.push(HEADER_T1); rows.forEach((r)=>{ const c=normalize(r); lines.push([ c.fecha,c.total, c.halak,pct(c.halak,c.total).toFixed(2), c.kosher,pct(c.kosher,c.total).toFixed(2), c.rechazo,c.rechazo_pct.toFixed(2), num(r['Total Registradas']), num(r['% Total']).toFixed(2), c.rcajon,c.rcajon_pct.toFixed(2), num(r['Rechazo por Livianos']), pct(num(r['Rechazo por Livianos']), c.total).toFixed(2), num(r['Rechazo por Pulmon roto']), pct(num(r['Rechazo por Pulmon roto']), c.total).toFixed(2), num(r['Rechazo por Pulmon']), pct(num(r['Rechazo por Pulmon']), c.total).toFixed(2) ]); }); } const csv = lines.map(row=>row.map(v=>{ if(v==null) return ''; const s=String(v).replace(/"/g,'""'); return /[",\n;]/.test(s)? `"${s}"` : s; }).join(',')).join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(mode==='t2'?'faena_table2':'faena_table1')+'.csv'; document.body.appendChild(a); a.click(); a.remove(); }
-    catch(e){ console.error('[faena] csv', e); }
-    finally { showOverlay(false); }
-  };
+    const lines = [header];
+
+    const esc = (v) => {
+      if (v == null) return '';
+      let s = String(v);
+      // duplicar comillas sin usar regex
+      if (s.includes('"')) s = s.split('"').join('""');
+      // decidir si necesita comillas
+      const needsQuotes = s.includes(',') || s.includes('\n') || s.includes(';');
+      return needsQuotes ? `"${s}"` : s;
+    };
+
+    rows.forEach((r) => {
+      const fecha = r['Fecha Faena'] || '';
+      const total = Number(r['Total Animales'] || 0);
+      const halak = Number(r['Aptos Halak'] || 0);
+      const kosher = Number(r['Aptos Kosher'] || 0);
+      const rech  = Number(r['Rechazos'] || 0);
+      const reg   = Number(r['Total Registradas'] || 0);
+      const pctTotal = Number(r['% Total'] || 0);
+
+      const rcajon = Number(r['Rechazo por cajón'] || r['Rechazo por cajon'] || 0);
+      const rcajon_pct = Number(r['Rechazo por cajón %'] || r['Rechazo por cajon %'] || 0);
+      const rliv = Number(r['Rechazo por Livianos'] || 0);
+      const rliv_pct = Number(r['Rechazo por Livianos %'] || 0);
+      const rpulR = Number(r['Rechazo por Pulmon roto'] || 0);
+      const rpulR_pct = Number(r['Rechazo por Pulmon roto %'] || 0);
+      const rpul = Number(r['Rechazo por Pulmon'] || 0);
+      const rpul_pct = Number(r['Rechazo por Pulmon %'] || 0);
+
+      const pct = (part, tot) => tot > 0 ? (100 * part / tot) : 0;
+
+      const arr = [
+        fecha, total,
+        halak, pct(halak,total).toFixed(2),
+        kosher, pct(kosher,total).toFixed(2),
+        rech, (pct(rech,total)).toFixed(2),
+        reg, pctTotal.toFixed(2),
+        rcajon, rcajon_pct.toFixed(2),
+        rliv, rliv_pct.toFixed(2),
+        rpulR, rpulR_pct.toFixed(2),
+        rpul, rpul_pct.toFixed(2),
+      ];
+
+      lines.push(arr.map(esc));
+    });
+
+    return lines.map(row => row.join(',')).join('\n');
+  }
 
   // Eventos
   btnApply?.addEventListener('click', ()=>{ cargarDatos(); });
