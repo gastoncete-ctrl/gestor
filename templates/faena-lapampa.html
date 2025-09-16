@@ -301,8 +301,8 @@
             <select id="filter-year"></select>
 
             <select id="tabla-select">
-                <option value="t1" selected>Tabla 1</option>
-                <option value="t2">Tabla 2</option>
+                <option>Tabla 1</option>
+                <option>Tabla 2</option>
             </select>
 
            <button id="apply-filter" class="secondary">Aplicar</button>
@@ -370,7 +370,7 @@
     </script>
     <script src="/static/temporadas_loader_v3.js"></script>
     <script src="/static/filters_month_year_loader_v5.js"></script>
-    <script src="/static/frontend_faena_apply_bind_v5.js"></script>
+    <script src="{{ url_for('static', filename='frontend_faena_apply_bind_v6_3.js') }}"></script>
     <script src="{{ url_for('static', filename='title_faena_dynamic.js') }}"></script>
 
 
