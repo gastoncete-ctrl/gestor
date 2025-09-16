@@ -1536,37 +1536,71 @@ def api_faena_clean():
         select_sql = f"""
             SELECT
             DATE_FORMAT(t.`Fecha Faena`, '%d-%m-%Y') AS `Fecha Faena`,
+
+            -- Totales base
             t.`Total Animales`      AS `Total Animales`,
             t.`Total Animales`      AS `Total Registradas`,
             100.00                  AS `% Total`,
 
+            -- Accepted (para resumen y Tabla 2)
             t.`Aptos Halak`         AS `Aptos Halak`,
             t.`Aptos Kosher`        AS `Aptos Kosher`,
+            t.`BEIT YOSEF`          AS `BEIT YOSEF`,
+            CASE WHEN t.`Total Animales` > 0
+            THEN ROUND(100 * t.`BEIT YOSEF` / t.`Total Animales`, 2)
+            ELSE 0 END           AS `BEIT YOSEF %`,
+
+            -- Rejected (agregados y desagregados)
             t.`Rechazos`            AS `Rechazos`,
 
+            t.`Rechazo por cajon`   AS `Rechazo por cajon`,
             t.`Rechazo por cajon`   AS `Rechazo por cajón`,
             CASE WHEN t.`Total Animales` > 0
-                THEN ROUND(100 * t.`Rechazo por cajon` / t.`Total Animales`, 2)
-                ELSE 0 END        AS `Rechazo por cajón %`,
+            THEN ROUND(100 * t.`Rechazo por cajon` / t.`Total Animales`, 2)
+            ELSE 0 END           AS `Rechazo por cajon %`,
+            CASE WHEN t.`Total Animales` > 0
+            THEN ROUND(100 * t.`Rechazo por cajon` / t.`Total Animales`, 2)
+            ELSE 0 END           AS `Rechazo por cajón %`,
+
+            t.`Rechazo por panza`   AS `Rechazo por panza`,
+            CASE WHEN t.`Total Animales` > 0
+            THEN ROUND(100 * t.`Rechazo por panza` / t.`Total Animales`, 2)
+            ELSE 0 END           AS `Rechazo por panza %`,
 
             t.`Rechazo por Livianos` AS `Rechazo por Livianos`,
             CASE WHEN t.`Total Animales` > 0
-                THEN ROUND(100 * t.`Rechazo por Livianos` / t.`Total Animales`, 2)
-                ELSE 0 END        AS `Rechazo por Livianos %`,
+            THEN ROUND(100 * t.`Rechazo por Livianos` / t.`Total Animales`, 2)
+            ELSE 0 END           AS `Rechazo por Livianos %`,
 
             t.`Rechazo por Pulmon roto` AS `Rechazo por Pulmon roto`,
             CASE WHEN t.`Total Animales` > 0
-                THEN ROUND(100 * t.`Rechazo por Pulmon roto` / t.`Total Animales`, 2)
-                ELSE 0 END        AS `Rechazo por Pulmon roto %`,
+            THEN ROUND(100 * t.`Rechazo por Pulmon roto` / t.`Total Animales`, 2)
+            ELSE 0 END           AS `Rechazo por Pulmon roto %`,
 
             t.`Rechazo por Pulmon`  AS `Rechazo por Pulmon`,
             CASE WHEN t.`Total Animales` > 0
-                THEN ROUND(100 * t.`Rechazo por Pulmon` / t.`Total Animales`, 2)
-                ELSE 0 END        AS `Rechazo por Pulmon %`
+            THEN ROUND(100 * t.`Rechazo por Pulmon` / t.`Total Animales`, 2)
+            ELSE 0 END           AS `Rechazo por Pulmon %`,
 
-            FROM faena t
+            -- Dentición (para Tabla 2)
+            t.`faena_2y4_dientes`   AS `faena_2y4_dientes`,
+            CASE WHEN t.`Total Animales` > 0
+            THEN ROUND(100 * t.`faena_2y4_dientes` / t.`Total Animales`, 2)
+            ELSE 0 END           AS `faena_2y4_dientes %`,
+
+            t.`faena_6_dientes`     AS `faena_6_dientes`,
+            CASE WHEN t.`Total Animales` > 0
+            THEN ROUND(100 * t.`faena_6_dientes` / t.`Total Animales`, 2)
+            ELSE 0 END           AS `faena_6_dientes %`,
+
+            t.`faena_8_dientes`     AS `faena_8_dientes`,
+            CASE WHEN t.`Total Animales` > 0
+            THEN ROUND(100 * t.`faena_8_dientes` / t.`Total Animales`, 2)
+            ELSE 0 END           AS `faena_8_dientes %`
+
+            FROM `faena` t
             {where_sql}
-            ORDER BY t.`Fecha Faena` {order_sql}   -- <— usa la columna DATE, no el alias formateado
+            ORDER BY t.`Fecha Faena` {order_sql}
             LIMIT %s OFFSET %s;
         """
         cur.execute(select_sql, params + [per_page, offset])
