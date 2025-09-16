@@ -56,6 +56,14 @@
     return t > 0 ? (num(part) * 100) / t : 0;
   }
 
+  function updateTitle() {
+    const el = document.getElementById('title-faena');
+    if (!el) return;
+    const f = elFrig?.value && elFrig.value.trim();
+    const c = elCli?.value && elCli.value.trim();
+    el.textContent = (!f || !c) ? 'Seleccione frigorífico y cliente' : `Faena - ${f} - ${c}`;
+  }
+
   function extractRow(r) {
     // Aliases exactos del backend (con espacios y acentos)
     const total        = num(r['Total Animales']);
@@ -257,16 +265,25 @@
 
   function onApply() {
     fetchData();
+    updateTitle();
   }
 
   function onClear() {
     goToLatestAndLoad();
+    updateTitle();
   }
 
   // Eventos
   if (btnApply) btnApply.addEventListener('click', onApply);
   if (btnClear) btnClear.addEventListener('click', onClear);
   if (btnCsv)   btnCsv  .addEventListener('click', onDownloadCsv);
+
+  // Actualizar título al cambiar frigorífico/cliente
+  elFrig?.addEventListener('change', updateTitle);
+  elCli?.addEventListener('change', updateTitle);
+
+  // título inicial
+  updateTitle();
 
   // Exponemos por si se necesita
   window.__faena = { fetchData, goToLatestAndLoad };
