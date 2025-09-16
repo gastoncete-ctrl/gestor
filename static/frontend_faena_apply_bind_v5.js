@@ -1,26 +1,31 @@
-// v5 — Binder de filtros + render de tabla + totales + CSV
+// v5 — Binder de filtros + render de tabla + totales + CSV + título dinámico
 (() => {
   const CFG = window.FILTERS_CONFIG || {};
   const $ = (s) => document.querySelector(s);
 
+  // Selectores (se pueden sobreescribir con window.FILTERS_CONFIG)
   const elFrig = $(CFG.frigorifico || '#selFrigorifico');
   const elCli  = $(CFG.cliente     || '#selCliente');
   const elTemp = $(CFG.temporada   || '#temporadaSelect');
   const elMes  = $(CFG.mes         || '#filter-month');
   const elAno  = $(CFG.anio        || '#filter-year');
 
+  // Botones
   const btnApply = $(CFG.aplicar || '#apply-filter');
   const btnClear = $('#clear-filter');
   const btnCsv   = $('#download-csv');
 
+  // UI
   const overlay  = $('#loading-overlay');
   const tbody    = $('#faena-tbody');
 
+  // Summary
   const sumTotal   = $('#sum-total');
   const sumHalak   = $('#sum-halak');
   const sumKosher  = $('#sum-kosher');
   const sumRechazo = $('#sum-rechazo');
 
+  // Helpers UI
   const showLoading = (v) => {
     if (!overlay) return;
     overlay.setAttribute('aria-hidden', v ? 'false' : 'true');
@@ -33,7 +38,7 @@
     add('frigorifico', opts.frigorifico ?? elFrig?.value);
     add('cliente',     opts.cliente     ?? elCli?.value);
 
-    // si hay temporada, la priorizamos por encima de mes/año
+    // Si hay temporada, la priorizamos sobre mes/año
     const sid = opts.season_id ?? elTemp?.value;
     if (sid) add('season_id', sid);
     else {
@@ -47,25 +52,49 @@
     return q;
   }
 
+  // Formatos/numéricos
   function fmtInt(v)  { const n = Number(v ?? 0); return Number.isFinite(n) ? n.toLocaleString('es-AR') : '0'; }
   function fmtPct(v)  { const n = Number(v ?? 0); return `${n.toFixed(2)}%`; }
   function num(v)     { const n = Number(v); return Number.isFinite(n) ? n : 0; }
-
   function computePerc(part, total) {
     const t = num(total);
     return t > 0 ? (num(part) * 100) / t : 0;
   }
 
+  // Título dinámico
   function updateTitle() {
     const el = document.getElementById('title-faena');
     if (!el) return;
-    const f = elFrig?.value && elFrig.value.trim();
-    const c = elCli?.value && elCli.value.trim();
-    el.textContent = (!f || !c) ? 'Seleccione frigorífico y cliente' : `Faena - ${f} - ${c}`;
+
+    const getText = (sel) => {
+      if (!sel) return '';
+      const opt = sel.options?.[sel.selectedIndex];
+      return (opt?.textContent || '').trim();
+    };
+
+    const fVal = (elFrig?.value || '').trim();
+    const cVal = (elCli?.value  || '').trim();
+
+    if (!fVal || !cVal) {
+      el.textContent = 'Seleccione frigorífico y cliente';
+      return;
+    }
+
+    const fText = getText(elFrig);
+    const cText = getText(elCli);
+
+    // Si hay temporada, agregamos el texto entre paréntesis
+    let extra = '';
+    if (elTemp?.value) {
+      const tText = getText(elTemp);
+      if (tText) extra = ` (${tText})`;
+    }
+
+    el.textContent = `Faena - ${fText} - ${cText}${extra}`;
   }
 
+  // Normaliza fila entrante del backend
   function extractRow(r) {
-    // Aliases exactos del backend (con espacios y acentos)
     const total        = num(r['Total Animales']);
     const halak        = num(r['Aptos Halak']);
     const kosher       = num(r['Aptos Kosher']);
@@ -74,8 +103,8 @@
     const rcajon       = num(r['Rechazo por cajón']);
     const rcajon_pct   = num(r['Rechazo por cajón %']);
 
-    const rliv        = num(r['Rechazo por Livianos']);
-    const rliv_pct    = num(r['Rechazo por Livianos %']);
+    const rliv         = num(r['Rechazo por Livianos']);
+    const rliv_pct     = num(r['Rechazo por Livianos %']);
 
     const rpulRoto     = num(r['Rechazo por Pulmon roto']);
     const rpulRoto_pct = num(r['Rechazo por Pulmon roto %']);
@@ -84,9 +113,8 @@
     const rpul_pct     = num(r['Rechazo por Pulmon %']);
 
     const registradas  = num(r['Total Registradas']);
-    const pctTotal     = num(r['% Total']); // viene 100.00 desde el backend
+    const pctTotal     = num(r['% Total']);
 
-    // % calculados localmente
     const halak_pct   = computePerc(halak, total);
     const kosher_pct  = computePerc(kosher, total);
     const rechazo_pct = computePerc(rechazo, total);
@@ -99,7 +127,9 @@
     };
   }
 
+  // Render tabla
   function renderRows(rows) {
+    if (!tbody) return;
     tbody.innerHTML = '';
     const frag = document.createDocumentFragment();
 
@@ -108,23 +138,23 @@
       const c = extractRow(r);
       tr.innerHTML = `
         <td>${c.fecha || ''}</td>
-        <td>${fmtInt(c.total)}</td>
-        <td>${fmtInt(c.halak)}</td>
-        <td>${fmtPct(c.halak_pct)}</td>
-        <td>${fmtInt(c.kosher)}</td>
-        <td>${fmtPct(c.kosher_pct)}</td>
-        <td>${fmtInt(c.rechazo)}</td>
-        <td>${fmtPct(c.rechazo_pct)}</td>
-        <td>${fmtInt(c.registradas)}</td>
-        <td>${fmtPct(c.pctTotal)}</td>
-        <td>${fmtInt(c.rcajon)}</td>
-        <td>${fmtPct(c.rcajon_pct)}</td>
-        <td>${fmtInt(c.rliv)}</td>
-        <td>${fmtPct(c.rliv_pct)}</td>
-        <td>${fmtInt(c.rpulRoto)}</td>
-        <td>${fmtPct(c.rpulRoto_pct)}</td>
-        <td>${fmtInt(c.rpul)}</td>
-        <td>${fmtPct(c.rpul_pct)}</td>
+        <td class="num">${fmtInt(c.total)}</td>
+        <td class="num">${fmtInt(c.halak)}</td>
+        <td class="num">${fmtPct(c.halak_pct)}</td>
+        <td class="num">${fmtInt(c.kosher)}</td>
+        <td class="num">${fmtPct(c.kosher_pct)}</td>
+        <td class="num">${fmtInt(c.rechazo)}</td>
+        <td class="num">${fmtPct(c.rechazo_pct)}</td>
+        <td class="num">${fmtInt(c.registradas)}</td>
+        <td class="num">${fmtPct(c.pctTotal)}</td>
+        <td class="num">${fmtInt(c.rcajon)}</td>
+        <td class="num">${fmtPct(c.rcajon_pct)}</td>
+        <td class="num">${fmtInt(c.rliv)}</td>
+        <td class="num">${fmtPct(c.rliv_pct)}</td>
+        <td class="num">${fmtInt(c.rpulRoto)}</td>
+        <td class="num">${fmtPct(c.rpulRoto_pct)}</td>
+        <td class="num">${fmtInt(c.rpul)}</td>
+        <td class="num">${fmtPct(c.rpul_pct)}</td>
       `;
       frag.appendChild(tr);
     });
@@ -132,6 +162,7 @@
     tbody.appendChild(frag);
   }
 
+  // Summary
   function updateSummary(rows) {
     let total = 0, halak = 0, kosher = 0, rechazo = 0;
     rows.forEach((r) => {
@@ -151,6 +182,7 @@
     if (sumRechazo) sumRechazo.textContent = `${fmtInt(rechazo)} - ${fmtPct(rechazo_pct)}`;
   }
 
+  // Data
   async function fetchData(opts = {}) {
     const q = buildQueryParams(opts);
     const url = `/api/faena/la-pampa?${q.toString()}`;
@@ -167,7 +199,9 @@
       return rows;
     } catch (e) {
       console.error('[faena] error cargando datos', e);
-      tbody.innerHTML = `<tr><td colspan="18" style="text-align:center">No se pudieron cargar los datos.</td></tr>`;
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="18" style="text-align:center">No se pudieron cargar los datos.</td></tr>`;
+      }
       updateSummary([]);
       return [];
     } finally {
@@ -175,9 +209,8 @@
     }
   }
 
+  // Busca el último registro real para fijar mes/año
   async function goToLatestAndLoad() {
-    // Tomamos el último registro real vía API (order=desc, per_page=1),
-    // parseamos dd-mm-aaaa y seteamos mes/año para que queden visibles en los selects.
     const q = buildQueryParams({ order: 'desc', per_page: 1 });
     try {
       showLoading(true);
@@ -200,6 +233,7 @@
     return fetchData();
   }
 
+  // CSV
   function buildCsv(rows) {
     const header = [
       'Fecha de Faena', 'Total de Cabezas',
@@ -230,13 +264,15 @@
       ]);
     });
 
-    // CSV seguro
-    return lines.map(row => row.map(v => {
-      if (v == null) return '';
-      const s = String(v).replace(/"/g, '""');
-      return s.match(/[",\n;]/) ? `"${s}"` : s;
-    }).join(','))
-    .join('\n');
+    return lines
+      .map(row => row.map(v => {
+        if (v == null) return '';
+        const s = String(v).replace(/"/g, '""');
+        return /[",
+;]/.test(s) ? `"${s}"` : s;
+      }).join(','))
+      .join('
+');
   }
 
   async function onDownloadCsv() {
@@ -278,13 +314,11 @@
   if (btnClear) btnClear.addEventListener('click', onClear);
   if (btnCsv)   btnCsv  .addEventListener('click', onDownloadCsv);
 
-  // Actualizar título al cambiar frigorífico/cliente
+  // Actualizar título al cambiar frigorífico/cliente/temporada
   elFrig?.addEventListener('change', updateTitle);
-  elCli?.addEventListener('change', updateTitle);
+  elCli ?.addEventListener('change', updateTitle);
+  elTemp?.addEventListener('change', updateTitle);
 
-  // título inicial
+  // Inicial
   updateTitle();
-
-  // Exponemos por si se necesita
-  window.__faena = { fetchData, goToLatestAndLoad };
 })();
