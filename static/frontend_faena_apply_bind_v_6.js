@@ -1,7 +1,8 @@
-// v6.1 — Spinner en "Aplicar" + selector de tabla (Tabla 1 / Tabla 2 con subcolumnas)
+// v6 — Spinner en "Aplicar" + selector de tabla (Tabla 1 / Tabla 2)
 // - Mantiene la API existente (/api/faena/la-pampa)
+// - Elimina la dependencia del botón "Ir al último mes faenado" (no lo usa)
 // - Tabla 1 = igual a la anterior
-// - Tabla 2 = dos filas de encabezado (grupos: Dentition, Rejected, Accepted) usando los campos reales
+// - Tabla 2 = encabezados estilo planilla PDF; se rellenan solo los campos disponibles
 
 (() => {
   const CFG = window.FILTERS_CONFIG || {};
@@ -13,7 +14,7 @@
   const elTemp = $(CFG.temporada   || '#temporadaSelect');
   const elMes  = $(CFG.mes         || '#filter-month');
   const elAno  = $(CFG.anio        || '#filter-year');
-  const selTabla = $('#tabla-select'); // <select id="tabla-select">Tabla 1 / Tabla 2</select>
+  const selTabla = $('#tabla-select'); // NUEVO: <select id="tabla-select">Tabla 1 / Tabla 2</select>
 
   // Tabla
   const tabla  = $('#tabla-faena');
@@ -60,48 +61,17 @@
     return p;
   }
 
-  // Encabezados tabla 1 (plano)
+  // Encabezados
   const HEADER_T1 = [
     'Fecha de Faena','Total de Cabezas','Halak (Total)','Halak (%)','Kosher (Total)','Kosher (%)','Rechazo (Total)','Rechazo (%)','Total Registradas','% Total','Rechazo por cajón (Cant.)','Rechazo por cajón (%)','Rechazo por livianos (Cant.)','Rechazo por livianos (%)','Rechazo por pulmón roto (Cant.)','Rechazo por pulmón roto (%)','Rechazo por pulmón (Cant.)','Rechazo por pulmón (%)'
   ];
 
-  // Encabezado tabla 2 (dos filas)
-  function setHeaderT2(){
-    if(!thead) return;
-    thead.innerHTML = `
-      <tr>
-        <th rowspan="2">#</th>
-        <th rowspan="2">Slaughter Date</th>
-        <th rowspan="2">Heads</th>
-        <th colspan="6">Dentition</th>
-        <th colspan="8">Rejected</th>
-        <th colspan="4">Accepted</th>
-      </tr>
-      <tr>
-        <th>2–4 Teeth (qty)</th>
-        <th>2–4 Teeth (%)</th>
-        <th>6 Teeth (qty)</th>
-        <th>6 Teeth (%)</th>
-        <th>8 Teeth (qty)</th>
-        <th>8 Teeth (%)</th>
+  // Inspirado en el PDF adjunto (cabeceras simplificadas)
+  const HEADER_T2 = [
+    '#','Slaughter Date','Heads','2-4 Teeth (qty)','2-4 Teeth (%)','6 Teeth (qty)','6 Teeth (%)','8 Teeth (qty)','8 Teeth (%)','Rejected – Knocking box (qty)','Rejected – Knocking box (%)','Rejected – Stomach (qty)','Rejected – Stomach (%)','Rejected – Lung (qty)','Rejected – Lung (%)','Rejected – Total (qty)','Rejected – Total (%)','Beit Yosef (qty)','Beit Yosef (%)','Halak (qty)','Halak (%)','Accepted Total (qty)','Accepted Total (%)'
+  ];
 
-        <th>Knocking box (qty)</th>
-        <th>Knocking box (%)</th>
-        <th>Stomach (qty)</th>
-        <th>Stomach (%)</th>
-        <th>Lung (qty)</th>
-        <th>Lung (%)</th>
-        <th>Total (qty)</th>
-        <th>Total (%)</th>
-
-        <th>Beit Yosef (qty)</th>
-        <th>Beit Yosef (%)</th>
-        <th>Halak (qty)</th>
-        <th>Halak (%)</th>
-      </tr>`;
-  }
-
-  function setHeaderT1(){ if(!thead) return; const tr = document.createElement('tr'); tr.innerHTML = HEADER_T1.map(t=>`<th>${t}</th>`).join(''); thead.innerHTML=''; thead.appendChild(tr); }
+  function setHeader(arr){ if(!thead) return; const tr = document.createElement('tr'); tr.innerHTML = arr.map(t=>`<th>${t}</th>`).join(''); thead.innerHTML=''; thead.appendChild(tr); }
 
   // Normaliza fila del backend
   function normalize(r){
@@ -110,37 +80,27 @@
     const kosher  = num(r['Aptos Kosher']);
     const rej     = num(r['Rechazos']);
 
-    const rcajon  = num(r['Rechazo por cajon']) + num(r['Rechazo por cajón']); // admite ambas variantes
-    const rpanza  = num(r['Rechazo por panza']);
-    const rlung   = num(r['Rechazo por Pulmon']) + num(r['Rechazo por Pulmon roto']);
-
-    const d24     = num(r['faena_2y4_dientes']);
-    const d6      = num(r['faena_6_dientes']);
-    const d8      = num(r['faena_8_dientes']);
-
-    const beit    = num(r['BEIT YOSEF']);
-
-    const aceptados = halak + kosher; // aceptación total simplificada
+    const rcajon  = num(r['Rechazo por cajón']);
+    const rliv    = num(r['Rechazo por Livianos']);
+    const rpulR   = num(r['Rechazo por Pulmon roto']);
+    const rpul    = num(r['Rechazo por Pulmon']);
 
     return {
       fecha: r['Fecha Faena'],
-      total, halak, kosher, rechazo: rej,
-      rcajon, rpanza, rlung,
-      d24, d6, d8,
-      beit,
-      aceptados,
-      // porcentajes precomputados
-      d24_pct: pct(d24,total), d6_pct: pct(d6,total), d8_pct: pct(d8,total),
-      rcajon_pct: pct(rcajon,total), rpanza_pct: pct(rpanza,total), rlung_pct: pct(rlung,total),
-      rechazo_pct: pct(rej,total),
-      beit_pct: pct(beit,total), halak_pct: pct(halak,total), aceptados_pct: pct(aceptados,total)
+      total, halak, halak_pct: pct(halak,total), kosher, kosher_pct: pct(kosher,total),
+      rechazo: rej, rechazo_pct: pct(rej,total),
+      registradas: num(r['Total Registradas']), pctTotal: num(r['% Total']),
+      rcajon, rcajon_pct: pct(rcajon,total),
+      rliv,   rliv_pct: pct(rliv,total),
+      rpulR,  rpulR_pct: pct(rpulR,total),
+      rpul,   rpul_pct: pct(rpul,total),
     };
   }
 
   // Tabla 1 (igual que antes)
   function renderRowsTabla1(rows){
     if(!tbody) return;
-    setHeaderT1();
+    setHeader(HEADER_T1);
     tbody.innerHTML='';
     const frag = document.createDocumentFragment();
     rows.forEach((r)=>{
@@ -152,58 +112,61 @@
         <td class="num">${fmtInt(c.halak)}</td>
         <td class="num">${fmtPct(c.halak_pct)}</td>
         <td class="num">${fmtInt(c.kosher)}</td>
-        <td class="num">${fmtPct(pct(c.kosher,c.total))}</td>
+        <td class="num">${fmtPct(c.kosher_pct)}</td>
         <td class="num">${fmtInt(c.rechazo)}</td>
         <td class="num">${fmtPct(c.rechazo_pct)}</td>
-        <td class="num">${fmtInt(num(r['Total Registradas']))}</td>
-        <td class="num">${fmtPct(num(r['% Total']))}</td>
+        <td class="num">${fmtInt(c.registradas)}</td>
+        <td class="num">${fmtPct(c.pctTotal)}</td>
         <td class="num">${fmtInt(c.rcajon)}</td>
         <td class="num">${fmtPct(c.rcajon_pct)}</td>
-        <td class="num">${fmtInt(num(r['Rechazo por Livianos']))}</td>
-        <td class="num">${fmtPct(pct(num(r['Rechazo por Livianos']), c.total))}</td>
-        <td class="num">${fmtInt(num(r['Rechazo por Pulmon roto']))}</td>
-        <td class="num">${fmtPct(pct(num(r['Rechazo por Pulmon roto']), c.total))}</td>
-        <td class="num">${fmtInt(num(r['Rechazo por Pulmon']))}</td>
-        <td class="num">${fmtPct(pct(num(r['Rechazo por Pulmon']), c.total))}</td>`;
+        <td class="num">${fmtInt(c.rliv)}</td>
+        <td class="num">${fmtPct(c.rliv_pct)}</td>
+        <td class="num">${fmtInt(c.rpulR)}</td>
+        <td class="num">${fmtPct(c.rpulR_pct)}</td>
+        <td class="num">${fmtInt(c.rpul)}</td>
+        <td class="num">${fmtPct(c.rpul_pct)}</td>`;
       frag.appendChild(tr);
     });
     tbody.appendChild(frag);
   }
 
-  // Tabla 2 (dos filas de encabezado + subcolumnas)
+  // Tabla 2 (formato PDF). Los campos de dentición y Beit Yosef no existen aún en los datos; se dejan en blanco (—) a la espera de backend.
   function renderRowsTabla2(rows){
     if(!tbody) return;
-    setHeaderT2();
+    setHeader(HEADER_T2);
     tbody.innerHTML='';
     const frag = document.createDocumentFragment();
 
     rows.forEach((r, i)=>{
       const c = normalize(r);
+      const acceptedQty = c.total - c.rechazo; // simplificación: aceptados = total - rechazados
+      const acceptedPct = pct(acceptedQty, c.total);
+
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${i+1}</td>
         <td>${c.fecha||''}</td>
         <td class="num">${fmtInt(c.total)}</td>
-        <td class="num">${fmtInt(c.d24)}</td>
-        <td class="num">${fmtPct(c.d24_pct)}</td>
-        <td class="num">${fmtInt(c.d6)}</td>
-        <td class="num">${fmtPct(c.d6_pct)}</td>
-        <td class="num">${fmtInt(c.d8)}</td>
-        <td class="num">${fmtPct(c.d8_pct)}</td>
-
+        <td class="num">—</td>
+        <td class="num">—</td>
+        <td class="num">—</td>
+        <td class="num">—</td>
+        <td class="num">—</td>
+        <td class="num">—</td>
         <td class="num">${fmtInt(c.rcajon)}</td>
         <td class="num">${fmtPct(c.rcajon_pct)}</td>
-        <td class="num">${fmtInt(c.rpanza)}</td>
-        <td class="num">${fmtPct(c.rpanza_pct)}</td>
-        <td class="num">${fmtInt(c.rlung)}</td>
-        <td class="num">${fmtPct(c.rlung_pct)}</td>
+        <td class="num">—</td>
+        <td class="num">—</td>
+        <td class="num">${fmtInt(c.rpul + c.rpulR)}</td>
+        <td class="num">${fmtPct(pct(c.rpul + c.rpulR, c.total))}</td>
         <td class="num">${fmtInt(c.rechazo)}</td>
         <td class="num">${fmtPct(c.rechazo_pct)}</td>
-
-        <td class="num">${fmtInt(c.beit)}</td>
-        <td class="num">${fmtPct(c.beit_pct)}</td>
+        <td class="num">—</td>
+        <td class="num">—</td>
         <td class="num">${fmtInt(c.halak)}</td>
-        <td class="num">${fmtPct(c.halak_pct)}</td>`;
+        <td class="num">${fmtPct(c.halak_pct)}</td>
+        <td class="num">${fmtInt(acceptedQty)}</td>
+        <td class="num">${fmtPct(acceptedPct)}</td>`;
       frag.appendChild(tr);
     });
 
@@ -241,7 +204,7 @@
     }
   }
 
-  // CSV según tabla visible
+  // CSV: exporta lo que esté visible (Tabla 1 o 2) — opcionalmente podés mantener tu export previo
   async function onDownloadCsv(){
     const url = `/api/faena/la-pampa?${qs(buildParams())}`;
     showOverlay(true);
@@ -250,35 +213,38 @@
       const rows = Array.isArray(data?.rows) ? data.rows : [];
       const mode = selTabla?.value || 't1';
       const lines = [];
-      if (mode==='t2') {
-        // Export con encabezado plano para CSV
-        lines.push(['#','Slaughter Date','Heads','2-4 Teeth (qty)','2-4 Teeth (%)','6 Teeth (qty)','6 Teeth (%)','8 Teeth (qty)','8 Teeth (%)','Rejected Knocking box (qty)','Rejected Knocking box (%)','Rejected Stomach (qty)','Rejected Stomach (%)','Rejected Lung (qty)','Rejected Lung (%)','Rejected Total (qty)','Rejected Total (%)','Beit Yosef (qty)','Beit Yosef (%)','Halak (qty)','Halak (%)']);
-        rows.forEach((r,i)=>{
-          const c = normalize(r);
-          lines.push([ i+1, c.fecha||'', c.total, c.d24, c.d24_pct.toFixed(2), c.d6, c.d6_pct.toFixed(2), c.d8, c.d8_pct.toFixed(2), c.rcajon, c.rcajon_pct.toFixed(2), c.rpanza, c.rpanza_pct.toFixed(2), c.rlung, c.rlung_pct.toFixed(2), c.rechazo, c.rechazo_pct.toFixed(2), c.beit, c.beit_pct.toFixed(2), c.halak, c.halak_pct.toFixed(2) ]);
-        });
-      } else {
-        lines.push(HEADER_T1);
-        rows.forEach((r)=>{
-          const c = normalize(r);
+      if (mode==='t2') lines.push(HEADER_T2); else lines.push(HEADER_T1);
+      rows.forEach((r,i)=>{
+        const c = normalize(r);
+        if (mode==='t2'){
+          const acceptedQty = c.total - c.rechazo;
+          const acceptedPct = pct(acceptedQty, c.total);
+          lines.push([
+            i+1, c.fecha||'', c.total,
+            '', '', '', '', '', '',
+            c.rcajon, c.rcajon_pct.toFixed(2),
+            '', '', (c.rpul + c.rpulR), pct(c.rpul + c.rpulR, c.total).toFixed(2),
+            c.rechazo, c.rechazo_pct.toFixed(2),
+            '', '', c.halak, c.halak_pct.toFixed(2),
+            acceptedQty, acceptedPct.toFixed(2)
+          ]);
+        } else {
           lines.push([
             c.fecha, c.total,
-            c.halak, pct(c.halak,c.total).toFixed(2),
-            c.kosher, pct(c.kosher,c.total).toFixed(2),
+            c.halak, c.halak_pct.toFixed(2),
+            c.kosher, c.kosher_pct.toFixed(2),
             c.rechazo, c.rechazo_pct.toFixed(2),
-            num(r['Total Registradas']), num(r['% Total']).toFixed(2),
+            c.registradas, c.pctTotal.toFixed(2),
             c.rcajon, c.rcajon_pct.toFixed(2),
-            num(r['Rechazo por Livianos']), pct(num(r['Rechazo por Livianos']), c.total).toFixed(2),
-            num(r['Rechazo por Pulmon roto']), pct(num(r['Rechazo por Pulmon roto']), c.total).toFixed(2),
-            num(r['Rechazo por Pulmon']), pct(num(r['Rechazo por Pulmon']), c.total).toFixed(2)
+            c.rliv, c.rliv_pct.toFixed(2),
+            c.rpulR, c.rpulR_pct.toFixed(2),
+            c.rpul, c.rpul_pct.toFixed(2)
           ]);
-        });
-      }
-      const csv = lines.map(row => row.map(v => { if(v==null) return ''; const s = String(v).replace(/"/g,'""'); return /[",
-;]/.test(s) ? `"${s}"` : s; }).join(',')).join('
-');
+        }
+      });
+      const csv = lines.map(row => row.map(v => { if(v==null) return ''; const s = String(v).replace(/"/g,'""'); return /[",\n;]/.test(s) ? `"${s}"` : s; }).join(',')).join('\n');
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = (mode==='t2'?'faena_table2':'faena_table1')+ '.csv';
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = (selTabla?.value==='t2'?'faena_table2':'faena_table1')+ '.csv';
       document.body.appendChild(a); a.click(); a.remove();
     } catch(e){ console.error('[faena] csv', e); }
     finally { showOverlay(false); }

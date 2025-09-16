@@ -216,9 +216,31 @@
         font-weight: 500;
         }
 
+        #clear-filter { display: none !important; }
+
+
         .filters button.secondary:hover {
         background: #e2e2e2;
         }
+
+        #apply-filter[aria-busy="true"] {
+        position: relative;
+        opacity: .7;
+        pointer-events: none;
+        }
+        #apply-filter[aria-busy="true"]::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        margin: auto;
+        width: 1em; height: 1em;
+        border: .18em solid currentColor;
+        border-right-color: transparent;
+        border-radius: 50%;
+        animation: spin .8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
         </style>
 </head>
 <body>
@@ -277,6 +299,11 @@
 
             <label for="filter-year">Año</label>
             <select id="filter-year"></select>
+
+            <select id="tabla-select">
+                <option value="t1" selected>Tabla 1</option>
+                <option value="t2">Tabla 2</option>
+            </select>
 
            <button id="apply-filter" class="secondary">Aplicar</button>
             <button class="secondary" id="clear-filter">Ir al último mes faenado</button>
