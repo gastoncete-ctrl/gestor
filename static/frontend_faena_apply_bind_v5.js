@@ -59,26 +59,9 @@
   function updateTitle() {
     const el = document.getElementById('title-faena');
     if (!el) return;
-
-    // Usar el TEXTO visible del <option> seleccionado, no el value (id)
-    const getText = (sel) => {
-      if (!sel) return '';
-      const opt = sel.options?.[sel.selectedIndex];
-      return (opt?.textContent || '').trim();
-    };
-
-    const fVal = (elFrig?.value || '').trim();
-    const cVal = (elCli?.value  || '').trim();
-
-    if (!fVal || !cVal) {
-      el.textContent = 'Seleccione frigorífico y cliente';
-      return;
-    }
-
-    const fText = getText(elFrig);
-    const cText = getText(elCli);
-    el.textContent = `Faena - ${fText} - ${cText}`;
-  } - ${c}`;
+    const f = elFrig?.value && elFrig.value.trim();
+    const c = elCli?.value && elCli.value.trim();
+    el.textContent = (!f || !c) ? 'Seleccione frigorífico y cliente' : `Faena - ${f} - ${c}`;
   }
 
   function extractRow(r) {
