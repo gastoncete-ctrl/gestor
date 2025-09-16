@@ -1,11 +1,12 @@
-// /static/frontend_faena_pagination_v7_summary.js
 (() => {
-  const API      = '/api/faena/la-pampa';
-  let   page     = 1;
-  let   perPage  = 10;       // cambia si quieres por defecto 25/50/100
-  let   order    = 'asc';    // o 'desc'
+  const API = '/api/faena/la-pampa';
 
-  // DOM (ajusta los IDs si en tu HTML tienen otros)
+  let page    = 1;
+  let perPage = 10;
+  let order   = 'asc';
+  let filters = {};  // {frigorifico, cliente, season_id, month, year}
+
+  // DOM
   const $sumTotal  = document.querySelector('#sum-total');
   const $sumHalak  = document.querySelector('#sum-halak');
   const $sumKosher = document.querySelector('#sum-kosher');
@@ -36,7 +37,9 @@
   }
 
   function renderTable(rows) {
-    $tbody.innerHTML = '';
+    if ($tbody) $tbody.innerHTML = '';
+    if (!Array.isArray(rows)) return;
+
     for (const item of rows) {
       const fecha   = item['Fecha Faena'] || item['FechaISO'] || '';
       const total   = n(item['Total de Cabezas'] ?? item['Total Animales']);
@@ -101,7 +104,7 @@
       return b;
     };
 
-    const windowSize = 5; // cantidad de botones de página visibles
+    const windowSize = 5;
     let start = Math.max(1, page - Math.floor(windowSize/2));
     let end   = Math.min(totalPages, start + windowSize - 1);
     start     = Math.max(1, Math.min(start, end - windowSize + 1));
@@ -117,7 +120,6 @@
     $pager.appendChild(makeBtn('›', Math.min(totalPages, page + 1), page === totalPages));
     $pager.appendChild(makeBtn('»', totalPages, page === totalPages));
 
-    // selector de "filas por página"
     const sel = document.createElement('select');
     sel.style.marginLeft = '8px';
     [10, 25, 50, 100, 250, 500].forEach(v => {
@@ -137,8 +139,21 @@
 
   async function loadPage() {
     try {
-      const url = `${API}?page=${page}&per_page=${perPage}&order=${order}`;
-      const res = await fetch(url, { cache: 'no-store' });
+      // Armo querystring con filtros + paginación
+      const qs = new URLSearchParams({
+        page: String(page),
+        per_page: String(perPage),
+        order
+      });
+
+      ['frigorifico','cliente','season_id','month','year'].forEach(k => {
+        const v = filters[k];
+        if (v !== undefined && v !== null && v !== '' && !Number.isNaN(+v)) {
+          qs.set(k, String(+v));
+        }
+      });
+
+      const res = await fetch(`${API}?${qs.toString()}`, { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
@@ -151,5 +166,32 @@
     }
   }
 
-  document.addEventListener('DOMContentLoaded', loadPage);
+  // API pública para otros scripts (botón "Aplicar")
+  window.cargarDatosFaena = (f = {}) => {
+    // normalizo filtros
+    const tmp = {};
+    ['frigorifico','cliente','season_id','month','year'].forEach(k => {
+      const v = f[k];
+      if (v !== undefined && v !== null && v !== '' && !Number.isNaN(+v)) {
+        tmp[k] = +v;
+      }
+    });
+    filters = tmp;
+    page = 1;
+    loadPage();
+  };
+
+  // API para limpiar tabla cuando se cambien combos
+  window.resetTablaFaena = () => {
+    renderSummary(null);
+    if ($tbody) $tbody.innerHTML = '';
+    if ($pager) $pager.innerHTML = '';
+  };
+
+  // NO cargamos datos al inicio: la tabla queda vacía hasta que el usuario apriete "Aplicar".
+  document.addEventListener('DOMContentLoaded', () => {
+    renderSummary(null);
+    if ($tbody) $tbody.innerHTML = '';
+    if ($pager) $pager.innerHTML = '';
+  });
 })();

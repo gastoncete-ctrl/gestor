@@ -258,16 +258,24 @@
     </div>
 
         <div class="filters">
+            <label for="filter-frigorifico">Frigorífico</label>
+            <select id="selFrigorifico" class="form-control">
+                <option value="">— Seleccionar frigorífico —</option>
+            </select>    
+            
+            <label for="filter-cliente">Cliente</label>
+            <select id="selCliente"></select>         
+
             <label for="filter-season">Temporada</label>
-            <select id="filter-season"></select>
+            <select id="temporadaSelect"></select>
 
             <label for="filter-month">Mes</label>
             <select id="filter-month"></select>
 
             <label for="filter-year">Año</label>
-            <input id="filter-year" type="number" min="1900" max="2100" step="1" />
+            <select id="filter-year"></select>
 
-            <button class="secondary" id="apply-filter">Aplicar</button>
+           <button id="apply-filter" class="secondary">Aplicar</button>
             <button class="secondary" id="clear-filter">Ir al último mes faenado</button>
 
             <button id="download-csv" class="primary">Descargar</button>
@@ -309,14 +317,30 @@
                         <th>%</th>
                     </tr>
                 </thead>
-                <tbody id="faena-table-body">
+                <tbody id="faena-tbody"></tbody>
                 </tbody>
             </table>
         </div>
     </div>
 
-    <script src="/static/frontend_faena_pagination_v7_summary.js"></script>
+    <script src="/static/frontend_frigorifico_loader.js"></script>
 
+    <script src="/static/frontend_cliente_loader_fast.js"></script>
+    <script>
+        // Mapea tus IDs actuales para que el loader los encuentre
+        window.FILTERS_CONFIG = {
+            frigorifico: '#selFrigorifico',
+            cliente:     '#selCliente',
+            temporada:   '#temporadaSelect',
+            mes:         '#filter-month',
+            anio:        '#filter-year',
+            aplicar:     '#apply-filter'
+
+        };
+    </script>
+    <script src="/static/temporadas_loader_v3.js"></script>
+    <script src="/static/filters_month_year_loader_v5.js"></script>
+    <script src="/static/frontend_faena_apply_bind_v4.js"></script>
 
 
 
