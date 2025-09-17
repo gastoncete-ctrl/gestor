@@ -1,7 +1,13 @@
-// v6.2 — Spinner en "Aplicar" + selector de tabla (Tabla 1 / Tabla 2 con subcolumnas y bloque Accepted)
-// No requiere cambios de HTML salvo <select id="tabla-select">. Soporta ausencia de overlay.
+// v6.3 (robusto) para TU NOMBRE DE ARCHIVO ORIGINAL: frontend_faena_apply_bind_v5.js
+// - Mantiene el nombre de archivo para evitar 404 del <script>
+// - Selectores tolerantes a tus IDs reales (#faena-tbody / #faena-thead) o a un <table id="tabla-faena">
+// - Tabla 1: NO toca el thead original del HTML (usa el que ya tenés)
+// - Tabla 2: thead de 2 filas con grupos (Dentition / Rejected / Accepted)
+// - Selector de tabla acepta value "t1/t2" o texto "Tabla 1/Tabla 2"
+// - Spinner en Aplicar; CSV sin regex
 
 (() => {
+  console.info('[faena] v6.3 loaded (robusto)');
   const CFG = window.FILTERS_CONFIG || {};
   const $ = (s) => document.querySelector(s);
 
@@ -13,10 +19,10 @@
   const elAno  = $(CFG.anio        || '#filter-year');
   const selTabla = $('#tabla-select'); // <select id="tabla-select">Tabla 1 / Tabla 2</select>
 
-  // Tabla
-  const tabla  = $('#tabla-faena');
-  const thead  = tabla?.querySelector('thead');
-  const tbody  = tabla?.querySelector('tbody');
+  // Tabla (tolerante a distintas estructuras)
+  const thead = $('#faena-thead') || document.querySelector('#tabla-faena thead') || document.querySelector('table thead');
+  const tbody = $('#faena-tbody') || document.querySelector('#tabla-faena tbody') || document.querySelector('table tbody');
+  const originalTheadHTML = thead ? thead.innerHTML : '';
 
   // Botones
   const btnApply = $(CFG.aplicar || '#apply-filter');
@@ -30,6 +36,9 @@
   const sumHalak   = $('#sum-halak');
   const sumKosher  = $('#sum-kosher');
   const sumRechazo = $('#sum-rechazo');
+
+  // Estado
+  let lastRows = [];
 
   // Utils
   async function fetchJSON(url) {
@@ -54,13 +63,7 @@
     return p;
   };
 
-  // Encabezados tabla 1 (plano)
-  const HEADER_T1 = [
-    'Fecha de Faena','Total de Cabezas','Halak (Total)','Halak (%)','Kosher (Total)','Kosher (%)','Rechazo (Total)','Rechazo (%)','Total Registradas','% Total','Rechazo por cajón (Cant.)','Rechazo por cajón (%)','Rechazo por livianos (Cant.)','Rechazo por livianos (%)','Rechazo por pulmón roto (Cant.)','Rechazo por pulmón roto (%)','Rechazo por pulmón (Cant.)','Rechazo por pulmón (%)'
-  ];
-  const setHeaderT1 = ()=>{ if(!thead) return; const tr = document.createElement('tr'); tr.innerHTML = HEADER_T1.map(t=>`<th>${t}</th>`).join(''); thead.innerHTML=''; thead.appendChild(tr); };
-
-  // Encabezado tabla 2 (dos filas). Accepted = bloque único con BY y Halak.
+  // Header Tabla 2 (dos filas). Accepted = bloque único con BY y Halak.
   const setHeaderT2 = ()=>{
     if(!thead) return;
     thead.innerHTML = `
@@ -94,7 +97,7 @@
       </tr>`;
   };
 
-  // Normaliza fila del backend (admite variantes con/ sin acento)
+  // Normaliza fila (admite variantes con/ sin acento)
   const normalize = (r)=>{
     const total   = num(r['Total Animales']);
     const halak   = num(r['Aptos Halak']);
@@ -115,9 +118,9 @@
     };
   };
 
-  // Render Tabla 1 (legacy)
+  // Render Tabla 1 (NO tocamos thead)
   const renderRowsTabla1 = (rows)=>{
-    if(!tbody) return; setHeaderT1(); tbody.innerHTML=''; const frag = document.createDocumentFragment();
+    if(!tbody) return; tbody.innerHTML=''; const frag = document.createDocumentFragment();
     rows.forEach((r)=>{ const c = normalize(r); const tr = document.createElement('tr'); tr.innerHTML = `
       <td>${c.fecha||''}</td>
       <td class="num">${fmtInt(c.total)}</td>
@@ -140,7 +143,7 @@
     tbody.appendChild(frag);
   };
 
-  // Render Tabla 2 (dos filas de encabezado + Accepted bloque)
+  // Render Tabla 2 (setea thead de 2 filas)
   const renderRowsTabla2 = (rows)=>{
     if(!tbody) return; setHeaderT2(); tbody.innerHTML=''; const frag = document.createDocumentFragment();
     rows.forEach((r,i)=>{ const c = normalize(r); const tr = document.createElement('tr'); tr.innerHTML = `
@@ -168,23 +171,73 @@
     tbody.appendChild(frag);
   };
 
-  // Render & resumen
-  const render = (rows)=>{ (selTabla?.value||'t1')==='t2' ? renderRowsTabla2(rows) : renderRowsTabla1(rows); };
-  const updateSummary = (rows)=>{ let total=0,halak=0,kosher=0,rechazo=0; rows.forEach((r)=>{ total+=num(r['Total Animales']); halak+=num(r['Aptos Halak']); kosher+=num(r['Aptos Kosher']); rechazo+=num(r['Rechazos']); }); if(sumTotal) sumTotal.textContent=`${fmtInt(total)} - 100%`; if(sumHalak) sumHalak.textContent=`${fmtInt(halak)} - ${fmtPct(pct(halak,total))}`; if(sumKosher) sumKosher.textContent=`${fmtInt(kosher)} - ${fmtPct(pct(kosher,total))}`; if(sumRechazo) sumRechazo.textContent=`${fmtInt(rechazo)} - ${fmtPct(pct(rechazo,total))}`; };
+  function getMode(){
+    const raw = (selTabla?.value || '').toLowerCase();
+    if (!raw) return 't1';
+    // Acepta value='t2' o texto 'tabla 2'
+    if (raw.includes('2')) return 't2';
+    return 't1';
+  }
 
-  // Carga de datos
+  const render = (rows)=>{
+    if (!thead || !tbody) {
+      console.warn('[faena] No encontré thead/tbody. Verificá IDs (#faena-thead/#faena-tbody) o un <table> visible.');
+      return;
+    }
+    if (getMode()==='t2') {
+      renderRowsTabla2(rows);
+    } else {
+      if (originalTheadHTML) thead.innerHTML = originalTheadHTML; // restaurar tu header original
+      renderRowsTabla1(rows);
+    }
+  };
+
+  const updateSummary = (rows)=>{
+    let total=0,halak=0,kosher=0,rechazo=0;
+    rows.forEach((r)=>{ total+=num(r['Total Animales']); halak+=num(r['Aptos Halak']); kosher+=num(r['Aptos Kosher']); rechazo+=num(r['Rechazos']); });
+    if(sumTotal)   sumTotal.textContent=`${fmtInt(total)} - 100%`;
+    if(sumHalak)   sumHalak.textContent=`${fmtInt(halak)} - ${fmtPct(pct(halak,total))}`;
+    if(sumKosher)  sumKosher.textContent=`${fmtInt(kosher)} - ${fmtPct(pct(kosher,total))}`;
+    if(sumRechazo) sumRechazo.textContent=`${fmtInt(rechazo)} - ${fmtPct(pct(rechazo,total))}`;
+  };
+
   const cargarDatos = async()=>{
     const url = `/api/faena/la-pampa?${qs(buildParams())}`;
     showOverlay(true); setBtnLoading(true);
-    try { const data = await fetchJSON(url); const rows = Array.isArray(data?.rows)? data.rows : []; render(rows); updateSummary(rows); }
-    catch(e){ console.error('[faena] error', e); if(tbody) tbody.innerHTML = `<tr><td colspan="24" style="text-align:center">No se pudieron cargar los datos.</td></tr>`; updateSummary([]); }
+    try {
+      const data = await fetchJSON(url);
+      const rows = Array.isArray(data?.rows)? data.rows : [];
+      lastRows = rows;
+      render(rows);
+      updateSummary(rows);
+    }
+    catch(e){ console.error('[faena] error', e); if(tbody) tbody.innerHTML = `<tr><td colspan=\"24\" style=\"text-align:center\">No se pudieron cargar los datos.</td></tr>`; updateSummary([]); }
     finally { showOverlay(false); setBtnLoading(false); }
   };
 
-  // CSV según tabla
+  // CSV sin regex
+  function buildCsv_T1(rows){
+    const header = [ 'Fecha de Faena','Total de Cabezas','Halak (Total)','Halak (%)','Kosher (Total)','Kosher (%)','Rechazo (Total)','Rechazo (%)','Total Registradas','% Total','Rechazo por cajón (Cant.)','Rechazo por cajón (%)','Rechazo por livianos (Cant.)','Rechazo por livianos (%)','Rechazo por pulmón roto (Cant.)','Rechazo por pulmón roto (%)','Rechazo por pulmón (Cant.)','Rechazo por pulmón (%)' ];
+    const lines=[header];
+    const esc=(v)=>{ if(v==null) return ''; let s=String(v); if(s.includes('"')) s=s.split('"').join('""'); const needs=s.includes(',')||s.includes('\n')||s.includes(';'); return needs?`"${s}"`:s; };
+    rows.forEach((r)=>{
+      const total=num(r['Total Animales']); const halak=num(r['Aptos Halak']); const kosher=num(r['Aptos Kosher']); const rech=num(r['Rechazos']);
+      const arr=[ r['Fecha Faena']||'', total, halak, pct(halak,total).toFixed(2), kosher, pct(kosher,total).toFixed(2), rech, pct(rech,total).toFixed(2), num(r['Total Registradas']), num(r['% Total']).toFixed(2), num(r['Rechazo por cajón']??r['Rechazo por cajon']), pct(num(r['Rechazo por cajón']??r['Rechazo por cajon']), total).toFixed(2), num(r['Rechazo por Livianos']), pct(num(r['Rechazo por Livianos']), total).toFixed(2), num(r['Rechazo por Pulmon roto']), pct(num(r['Rechazo por Pulmon roto']), total).toFixed(2), num(r['Rechazo por Pulmon']), pct(num(r['Rechazo por Pulmon']), total).toFixed(2) ];
+      lines.push(arr.map(esc));
+    });
+    return lines.map(r=>r.join(',')).join('\n');
+  }
+  function buildCsv_T2(rows){
+    const header=['#','Slaughter Date','Heads','2-4 Teeth (qty)','2-4 Teeth (%)','6 Teeth (qty)','6 Teeth (%)','8 Teeth (qty)','8 Teeth (%)','Rejected Knocking box (qty)','Rejected Knocking box (%)','Rejected Stomach (qty)','Rejected Stomach (%)','Rejected Lung (qty)','Rejected Lung (%)','Rejected Total (qty)','Rejected Total (%)','Beit Yosef (qty)','Beit Yosef (%)','Halak (qty)','Halak (%)'];
+    const lines=[header];
+    const esc=(v)=>{ if(v==null) return ''; let s=String(v); if(s.includes('"')) s=s.split('"').join('""'); const needs=s.includes(',')||s.includes('\n')||s.includes(';'); return needs?`"${s}"`:s; };
+    rows.forEach((r,i)=>{ const c=normalize(r); lines.push([ i+1, c.fecha||'', c.total, c.d24, c.d24_pct.toFixed(2), c.d6, c.d6_pct.toFixed(2), c.d8, c.d8_pct.toFixed(2), c.rcajon, c.rcajon_pct.toFixed(2), c.rpanza, c.rpanza_pct.toFixed(2), c.rlung, c.rlung_pct.toFixed(2), c.rechazo, c.rechazo_pct.toFixed(2), c.beit, c.beit_pct.toFixed(2), c.halak, c.halak_pct.toFixed(2) ].map(esc)); });
+    return lines.map(r=>r.join(',')).join('\n');
+  }
+
   const onDownloadCsv = async()=>{
     const url = `/api/faena/la-pampa?${qs(buildParams())}`; showOverlay(true);
-    try { const data = await fetchJSON(url); const rows = Array.isArray(data?.rows)? data.rows : []; const mode = selTabla?.value||'t1'; const lines = []; if(mode==='t2'){ lines.push(['#','Slaughter Date','Heads','2-4 Teeth (qty)','2-4 Teeth (%)','6 Teeth (qty)','6 Teeth (%)','8 Teeth (qty)','8 Teeth (%)','Rejected Knocking box (qty)','Rejected Knocking box (%)','Rejected Stomach (qty)','Rejected Stomach (%)','Rejected Lung (qty)','Rejected Lung (%)','Rejected Total (qty)','Rejected Total (%)','Beit Yosef (qty)','Beit Yosef (%)','Halak (qty)','Halak (%)']); rows.forEach((r,i)=>{ const c = normalize(r); lines.push([ i+1,c.fecha||'',c.total,c.d24,c.d24_pct.toFixed(2),c.d6,c.d6_pct.toFixed(2),c.d8,c.d8_pct.toFixed(2),c.rcajon,c.rcajon_pct.toFixed(2),c.rpanza,c.rpanza_pct.toFixed(2),c.rlung,c.rlung_pct.toFixed(2),c.rechazo,c.rechazo_pct.toFixed(2),c.beit,c.beit_pct.toFixed(2),c.halak,c.halak_pct.toFixed(2) ]); }); } else { lines.push(HEADER_T1); rows.forEach((r)=>{ const c=normalize(r); lines.push([ c.fecha,c.total, c.halak,pct(c.halak,c.total).toFixed(2), c.kosher,pct(c.kosher,c.total).toFixed(2), c.rechazo,c.rechazo_pct.toFixed(2), num(r['Total Registradas']), num(r['% Total']).toFixed(2), c.rcajon,c.rcajon_pct.toFixed(2), num(r['Rechazo por Livianos']), pct(num(r['Rechazo por Livianos']), c.total).toFixed(2), num(r['Rechazo por Pulmon roto']), pct(num(r['Rechazo por Pulmon roto']), c.total).toFixed(2), num(r['Rechazo por Pulmon']), pct(num(r['Rechazo por Pulmon']), c.total).toFixed(2) ]); }); } const csv = lines.map(row=>row.map(v=>{ if(v==null) return ''; const s=String(v).replace(/"/g,'""'); return /[",\n;]/.test(s)? `"${s}"` : s; }).join(',')).join('\n'); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(mode==='t2'?'faena_table2':'faena_table1')+'.csv'; document.body.appendChild(a); a.click(); a.remove(); }
+    try { const data = await fetchJSON(url); const rows = Array.isArray(data?.rows)? data.rows : []; const csv = (getMode()==='t2') ? buildCsv_T2(rows) : buildCsv_T1(rows); const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=(getMode()==='t2'?'faena_table2':'faena_table1')+'.csv'; document.body.appendChild(a); a.click(); a.remove(); }
     catch(e){ console.error('[faena] csv', e); }
     finally { showOverlay(false); }
   };
@@ -192,7 +245,7 @@
   // Eventos
   btnApply?.addEventListener('click', ()=>{ cargarDatos(); });
   btnCsv  ?.addEventListener('click', onDownloadCsv);
-  selTabla?.addEventListener('change', cargarDatos);
+  selTabla?.addEventListener('change', ()=>{ render(lastRows); });
   [elFrig, elCli, elTemp, elMes, elAno].forEach((el)=> el?.addEventListener('change', ()=>{ if(el===elTemp){ if(elMes) elMes.disabled=!!elTemp.value; if(elAno) elAno.disabled=!!elTemp.value; } }));
 
   // Init
